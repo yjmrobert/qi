@@ -27,7 +27,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$SCRIPT_DIR/lib"
 
 # Source library files if they exist
-for lib in config cache git-ops script-ops ui utils; do
+for lib in config cache git-ops script-ops utils; do
     lib_file="$LIB_DIR/$lib.sh"
     if [[ -f "$lib_file" ]]; then
         source "$lib_file"

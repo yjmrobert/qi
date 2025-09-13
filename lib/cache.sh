@@ -300,22 +300,34 @@ acquire_cache_lock() {
     local lock_file="$cache_dir/$CACHE_LOCK_FILE"
     local waited=0
     
-    while [[ -f "$lock_file" && $waited -lt $timeout ]]; do
+    # Try to acquire lock atomically
+    while [[ $waited -lt $timeout ]]; do
+        # Use noclobber to atomically create lock file
+        if (set -C; echo "$$" > "$lock_file") 2>/dev/null; then
+            log "DEBUG" "Cache lock acquired: $lock_file"
+            return 0
+        fi
+        
+        # Check if lock file exists and if the process is still running
+        if [[ -f "$lock_file" ]]; then
+            local lock_pid
+            lock_pid=$(cat "$lock_file" 2>/dev/null)
+            
+            # If PID is empty or process doesn't exist, remove stale lock
+            if [[ -z "$lock_pid" ]] || ! kill -0 "$lock_pid" 2>/dev/null; then
+                log "DEBUG" "Removing stale lock file: $lock_file"
+                rm -f "$lock_file"
+                continue
+            fi
+        fi
+        
         log "DEBUG" "Waiting for cache lock... ($waited/$timeout)"
         sleep 1
         ((waited++))
     done
     
-    if [[ $waited -ge $timeout ]]; then
-        log "ERROR" "Timeout waiting for cache lock"
-        return 1
-    fi
-    
-    # Create lock file with PID
-    echo "$$" > "$lock_file"
-    log "DEBUG" "Cache lock acquired: $lock_file"
-    
-    return 0
+    log "ERROR" "Timeout waiting for cache lock"
+    return 1
 }
 
 # Release cache lock

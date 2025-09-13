@@ -210,14 +210,22 @@ update_repository() {
     # Perform git pull
     log "INFO" "Pulling latest changes..."
     
+    # Get current branch name
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null)
+    if [[ -z "$current_branch" ]]; then
+        log "WARN" "Unable to determine current branch, using default branch"
+        current_branch=$(get_config default_branch)
+    fi
+    
     if [[ "$DRY_RUN" == "true" ]]; then
-        log "INFO" "DRY RUN: Would execute: git pull origin"
+        log "INFO" "DRY RUN: Would execute: git pull origin $current_branch"
         cd "$original_dir"
         return 0
     fi
     
     local pull_output
-    if pull_output=$(git pull origin 2>&1); then
+    if pull_output=$(git pull origin "$current_branch" 2>&1); then
         local new_commit
         new_commit=$(git rev-parse HEAD 2>/dev/null)
         
@@ -317,8 +325,33 @@ get_repository_status() {
     local status_output
     status_output=$(git status --porcelain 2>/dev/null)
     
+    # Try to get ahead/behind count using multiple methods
     local ahead_behind
-    ahead_behind=$(git rev-list --left-right --count origin/HEAD...HEAD 2>/dev/null || echo "0	0")
+    
+    # First try with origin/HEAD
+    ahead_behind=$(git rev-list --left-right --count origin/HEAD...HEAD 2>/dev/null)
+    
+    # If that fails, try with the current branch's upstream
+    if [[ -z "$ahead_behind" ]]; then
+        local upstream
+        upstream=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null)
+        if [[ -n "$upstream" ]]; then
+            ahead_behind=$(git rev-list --left-right --count "$upstream"...HEAD 2>/dev/null)
+        fi
+    fi
+    
+    # If still no result, try with origin/main or origin/master
+    if [[ -z "$ahead_behind" ]]; then
+        for branch in main master; do
+            if git rev-parse "origin/$branch" >/dev/null 2>&1; then
+                ahead_behind=$(git rev-list --left-right --count "origin/$branch"...HEAD 2>/dev/null)
+                break
+            fi
+        done
+    fi
+    
+    # Default to "0	0" if all methods fail
+    ahead_behind="${ahead_behind:-0	0}"
     
     local ahead behind
     behind=$(echo "$ahead_behind" | cut -f1)
