@@ -30,14 +30,14 @@ print_color() {
 
 # Test result functions
 test_pass() {
-    ((TESTS_PASSED++))
-    ((TESTS_TOTAL++))
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+    TESTS_TOTAL=$((TESTS_TOTAL + 1))
     print_color "$GREEN" "✓ PASS: $*"
 }
 
 test_fail() {
-    ((TESTS_FAILED++))
-    ((TESTS_TOTAL++))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    TESTS_TOTAL=$((TESTS_TOTAL + 1))
     print_color "$RED" "✗ FAIL: $*"
 }
 
