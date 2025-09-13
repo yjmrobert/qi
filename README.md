@@ -9,6 +9,7 @@
 - [Usage](#usage)
   - [Adding Repositories](#adding-repositories)
   - [Executing Scripts](#executing-scripts)
+  - [Updating Repositories](#updating-repositories)
   - [Removing Repositories](#removing-repositories)
 - [Examples](#examples)
 - [Configuration](#configuration)
@@ -99,6 +100,36 @@ qi deploy
 qi backup
 ```
 
+### Updating Repositories
+
+Update cached repositories to their latest versions:
+
+```bash
+qi update [repository-name]
+```
+
+**Parameters:**
+- `[repository-name]`: Optional. The name of a specific repository to update. If not provided, updates all cached repositories.
+
+**Behavior:**
+- If a repository name is specified, only that repository is updated
+- If no repository name is provided, all cached repositories are updated
+- Performs a `git pull` operation on the default branch of each repository
+- Shows update status for each repository (updated, already up-to-date, or error)
+- Maintains the current branch and any local modifications are preserved where possible
+
+**Examples:**
+```bash
+# Update all cached repositories
+qi update
+
+# Update only the 'deploy' repository
+qi update deploy
+
+# Update a specific repository by its full name
+qi update deployment-scripts
+```
+
 ### Removing Repositories
 
 Remove a repository from the qi cache:
@@ -132,7 +163,13 @@ qi add https://github.com/team/utilities.git
 # 2. Execute a script (assuming 'setup.bash' exists in one repository)
 qi setup
 
-# 3. Execute a script with conflicts (assuming 'backup.bash' exists in multiple repositories)
+# 3. Update all repositories to latest versions
+qi update
+
+# 4. Update only a specific repository
+qi update deploy
+
+# 5. Execute a script with conflicts (assuming 'backup.bash' exists in multiple repositories)
 qi backup
 # Output:
 # Multiple scripts found with name 'backup':
@@ -141,7 +178,7 @@ qi backup
 # Select repository [1-2]: 1
 # Executing backup.bash from deploy repository...
 
-# 4. Remove a repository when no longer needed
+# 6. Remove a repository when no longer needed
 qi remove tools
 ```
 
@@ -162,6 +199,41 @@ deployment-scripts/
 ```
 
 All scripts (`deploy`, `rollback`, `backup`, `restore`, `health-check`) will be discoverable by `qi`.
+
+### Update Command Examples
+
+**Update all repositories:**
+```bash
+qi update
+# Output:
+# Updating deploy (https://github.com/company/deployment-scripts.git)... ✓ Updated
+# Updating tools (https://github.com/user/personal-tools.git)... ✓ Already up-to-date  
+# Updating utilities (https://github.com/team/utilities.git)... ✓ Updated (3 new commits)
+```
+
+**Update specific repository:**
+```bash
+qi update deploy
+# Output:
+# Updating deploy (https://github.com/company/deployment-scripts.git)... ✓ Updated (1 new commit)
+# New scripts available: 
+#   - rollback-v2.bash
+#   - monitoring.bash
+```
+
+**Update with conflict resolution:**
+```bash
+qi update tools
+# Output:
+# Updating tools (https://github.com/user/personal-tools.git)... ⚠ Conflicts detected
+# Local changes found in: custom-config.bash
+# Options:
+# 1. Stash local changes and update
+# 2. Skip update and keep local changes  
+# 3. Show diff
+# Select option [1-3]: 1
+# ✓ Updated with local changes stashed
+```
 
 ## Configuration
 
@@ -216,6 +288,23 @@ qi list
 
 # Check repository contents
 ls -la ~/.qi/cache/<repository-name>/
+
+# Update repositories to get latest scripts
+qi update
+```
+
+**Repository update fails:**
+```bash
+# Check network connectivity
+ping github.com
+
+# Check git status in cache
+cd ~/.qi/cache/<repository-name>
+git status
+git pull
+
+# Force update (discards local changes)
+qi update --force <repository-name>
 ```
 
 **Permission denied when executing script:**
@@ -251,6 +340,11 @@ rm -rf ~/.qi/cache/
 **Update specific repository:**
 ```bash
 qi update <repository-name>
+```
+
+**Check update status:**
+```bash
+qi update --dry-run
 ```
 
 **List cached repositories:**
