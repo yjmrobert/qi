@@ -146,8 +146,9 @@ test_script_functionality() {
     # Add repository with scripts
     "$QI_SCRIPT" add https://github.com/octocat/Hello-World.git test-scripts >/dev/null 2>&1
     
-    # Create test script
-    local test_script_dir="$TEST_CACHE_DIR/test-scripts"
+    # Create test script in qi directory
+    local test_script_dir="$TEST_CACHE_DIR/test-scripts/qi"
+    mkdir -p "$test_script_dir"
     cat > "$test_script_dir/test.bash" << 'EOF'
 #!/bin/bash
 echo "Test script executed successfully"
