@@ -1,0 +1,644 @@
+#!/bin/bash
+
+# qi - Git Repository Script Manager
+# A Linux command line tool that manages a cache of remote git repositories
+# and allows you to quickly execute bash scripts from them by name.
+
+set -euo pipefail
+
+# Version information
+QI_VERSION="1.0.0"
+
+# Default configuration
+DEFAULT_CACHE_DIR="$HOME/.qi/cache"
+DEFAULT_CONFIG_FILE="$HOME/.qi/config"
+DEFAULT_BRANCH="main"
+
+# Global variables
+CACHE_DIR="${QI_CACHE_DIR:-$DEFAULT_CACHE_DIR}"
+CONFIG_FILE="${QI_CONFIG_FILE:-$DEFAULT_CONFIG_FILE}"
+VERBOSE=false
+DRY_RUN=false
+FORCE=false
+BACKGROUND=false
+
+# Script directory for sourcing libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/lib"
+
+# Source library files if they exist
+for lib in config cache git-ops script-ops ui utils; do
+    lib_file="$LIB_DIR/$lib.sh"
+    if [[ -f "$lib_file" ]]; then
+        source "$lib_file"
+    fi
+done
+
+# Display usage information
+show_usage() {
+    cat << EOF
+qi - Git Repository Script Manager v$QI_VERSION
+
+USAGE:
+    qi <command> [options] [arguments]
+    qi <script-name> [script-arguments]
+
+COMMANDS:
+    add <url> [name]        Add a git repository to the cache
+    remove <name>           Remove a repository from the cache
+    update [name]           Update repositories (all if no name specified)
+    list                    List available scripts
+    list-repos              List cached repositories
+    status                  Show cache status
+    config                  Show configuration
+    help                    Show this help message
+    version                 Show version information
+
+SCRIPT EXECUTION:
+    qi <script-name> [args] Execute a script by name from cached repositories
+
+OPTIONS:
+    -v, --verbose           Enable verbose output
+    -d, --dry-run          Show what would be done without executing
+    -f, --force            Force operations (skip confirmations)
+    -b, --background       Run script in background
+    -h, --help             Show this help message
+
+EXAMPLES:
+    qi add https://github.com/user/scripts.git
+    qi add https://github.com/user/tools.git mytools
+    qi update
+    qi update mytools
+    qi deploy
+    qi backup --env production
+    qi remove mytools
+
+CONFIGURATION:
+    Cache directory: $CACHE_DIR
+    Config file: $CONFIG_FILE
+
+ENVIRONMENT VARIABLES:
+    QI_CACHE_DIR           Override default cache directory
+    QI_DEFAULT_BRANCH      Override default git branch (default: main)
+
+For more information, see the documentation or visit the project repository.
+EOF
+}
+
+# Display version information
+show_version() {
+    echo "qi version $QI_VERSION"
+}
+
+# Log messages based on verbosity level
+log() {
+    local level="$1"
+    shift
+    local message="$*"
+    
+    case "$level" in
+        "ERROR")
+            echo "ERROR: $message" >&2
+            ;;
+        "WARN")
+            echo "WARNING: $message" >&2
+            ;;
+        "INFO")
+            if [[ "$VERBOSE" == true ]]; then
+                echo "INFO: $message"
+            fi
+            ;;
+        "DEBUG")
+            if [[ "$VERBOSE" == true ]]; then
+                echo "DEBUG: $message"
+            fi
+            ;;
+        *)
+            echo "$message"
+            ;;
+    esac
+}
+
+# Initialize qi environment
+init_qi() {
+    log "DEBUG" "Initializing qi environment"
+    
+    # Check dependencies
+    if ! check_dependencies; then
+        exit 1
+    fi
+    
+    # Initialize configuration system
+    if ! init_config; then
+        log "ERROR" "Failed to initialize configuration"
+        exit 1
+    fi
+    
+    # Initialize cache
+    if ! init_cache; then
+        log "ERROR" "Failed to initialize cache"
+        exit 1
+    fi
+    
+    log "DEBUG" "qi environment initialized successfully"
+}
+
+# Parse command line arguments
+parse_args() {
+    local args=()
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -v|--verbose)
+                VERBOSE=true
+                shift
+                ;;
+            -d|--dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            -f|--force)
+                FORCE=true
+                shift
+                ;;
+            -b|--background)
+                BACKGROUND=true
+                shift
+                ;;
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            --version)
+                show_version
+                exit 0
+                ;;
+            -*)
+                log "ERROR" "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+            *)
+                args+=("$1")
+                shift
+                ;;
+        esac
+    done
+    
+    # Set positional arguments
+    set -- "${args[@]}"
+    
+    # Export parsed arguments back to main
+    PARSED_ARGS=("$@")
+}
+
+# Main command dispatcher
+main() {
+    # Parse command line arguments
+    parse_args "$@"
+    set -- "${PARSED_ARGS[@]}"
+    
+    # Initialize qi environment
+    init_qi
+    
+    # Handle commands
+    if [[ $# -eq 0 ]]; then
+        show_usage
+        exit 0
+    fi
+    
+    local command="$1"
+    shift
+    
+    case "$command" in
+        "add")
+            if [[ $# -lt 1 ]]; then
+                log "ERROR" "Repository URL required for 'add' command"
+                echo "Usage: qi add <repository-url> [name]"
+                exit 1
+            fi
+            cmd_add "$@"
+            ;;
+        "remove")
+            if [[ $# -lt 1 ]]; then
+                log "ERROR" "Repository name required for 'remove' command"
+                echo "Usage: qi remove <name>"
+                exit 1
+            fi
+            cmd_remove "$@"
+            ;;
+        "update")
+            cmd_update "$@"
+            ;;
+        "list")
+            cmd_list "$@"
+            ;;
+        "list-repos")
+            cmd_list_repos "$@"
+            ;;
+        "status")
+            cmd_status "$@"
+            ;;
+        "help")
+            show_usage
+            ;;
+        "version")
+            show_version
+            ;;
+        "config")
+            cmd_config "$@"
+            ;;
+        *)
+            # Assume it's a script name to execute
+            cmd_execute_script "$command" "$@"
+            ;;
+    esac
+}
+
+# Placeholder command implementations (will be moved to library files)
+
+cmd_add() {
+    local url="$1"
+    local custom_name="${2:-}"
+    
+    log "INFO" "Adding repository: $url"
+    
+    # Validate URL
+    if ! validate_git_url "$url"; then
+        log "ERROR" "Invalid git repository URL: $url"
+        log "INFO" "URL must be in format: https://github.com/user/repo.git or git@github.com:user/repo.git"
+        exit 1
+    fi
+    
+    # Normalize URL
+    url=$(normalize_git_url "$url")
+    
+    # Determine repository name
+    local repo_name
+    if [[ -n "$custom_name" ]]; then
+        # Validate custom name
+        if ! validate_repo_name "$custom_name"; then
+            log "ERROR" "Invalid repository name: $custom_name"
+            log "INFO" "Name must contain only alphanumeric characters, dots, hyphens, and underscores"
+            exit 1
+        fi
+        repo_name="$custom_name"
+        log "INFO" "Using custom name: $repo_name"
+    else
+        # Extract name from URL
+        repo_name=$(get_repo_name_from_url "$url")
+        log "INFO" "Using repository name: $repo_name"
+    fi
+    
+    # Check for name conflicts
+    if check_repo_name_conflict "$repo_name"; then
+        if [[ -n "$custom_name" ]]; then
+            log "ERROR" "Repository name already exists: $repo_name"
+            log "INFO" "Use a different custom name or remove the existing repository first"
+            exit 1
+        else
+            # Generate unique name for auto-generated names
+            local original_name="$repo_name"
+            repo_name=$(generate_unique_repo_name "$repo_name")
+            log "WARN" "Repository name '$original_name' already exists, using '$repo_name'"
+        fi
+    fi
+    
+    # Acquire cache lock
+    if ! acquire_cache_lock; then
+        log "ERROR" "Failed to acquire cache lock"
+        exit 1
+    fi
+    
+    # Ensure cleanup on exit
+    trap 'release_cache_lock' EXIT
+    
+    # Clone repository
+    if clone_repository "$url" "$repo_name"; then
+        print_success "Repository added successfully: $repo_name"
+        log "INFO" "Repository cached at: $(get_repo_dir "$repo_name")"
+        
+        # Show available scripts (if any)
+        local script_count
+        script_count=$(find "$(get_repo_dir "$repo_name")" -name "*.bash" -type f 2>/dev/null | wc -l)
+        if [[ $script_count -gt 0 ]]; then
+            log "INFO" "Found $script_count bash script(s) in repository"
+        else
+            log "INFO" "No bash scripts found in repository"
+        fi
+    else
+        log "ERROR" "Failed to add repository: $url"
+        exit 1
+    fi
+}
+
+cmd_remove() {
+    local name="$1"
+    
+    log "INFO" "Removing repository: $name"
+    
+    # Validate repository name
+    if ! validate_repo_name "$name"; then
+        log "ERROR" "Invalid repository name: $name"
+        exit 1
+    fi
+    
+    # Check if repository exists
+    if ! repo_exists "$name"; then
+        log "ERROR" "Repository not found: $name"
+        log "INFO" "Use 'qi list-repos' to see available repositories"
+        exit 1
+    fi
+    
+    # Get repository information for confirmation
+    local repo_url
+    repo_url=$(read_repo_metadata "$name" "url" 2>/dev/null || echo "unknown")
+    
+    # Confirm removal
+    if ! confirm "Remove repository '$name' ($repo_url)?"; then
+        log "INFO" "Repository removal cancelled"
+        exit 0
+    fi
+    
+    # Acquire cache lock
+    if ! acquire_cache_lock; then
+        log "ERROR" "Failed to acquire cache lock"
+        exit 1
+    fi
+    
+    # Ensure cleanup on exit
+    trap 'release_cache_lock' EXIT
+    
+    # Remove repository from cache
+    if remove_repo_from_cache "$name"; then
+        print_success "Repository removed successfully: $name"
+    else
+        log "ERROR" "Failed to remove repository: $name"
+        exit 1
+    fi
+}
+
+cmd_update() {
+    local name="${1:-}"
+    
+    if [[ -n "$name" ]]; then
+        log "INFO" "Updating repository: $name"
+        
+        # Validate repository name
+        if ! validate_repo_name "$name"; then
+            log "ERROR" "Invalid repository name: $name"
+            exit 1
+        fi
+        
+        # Check if repository exists
+        if ! repo_exists "$name"; then
+            log "ERROR" "Repository not found: $name"
+            log "INFO" "Use 'qi list-repos' to see available repositories"
+            exit 1
+        fi
+        
+        # Acquire cache lock
+        if ! acquire_cache_lock; then
+            log "ERROR" "Failed to acquire cache lock"
+            exit 1
+        fi
+        
+        # Ensure cleanup on exit
+        trap 'release_cache_lock' EXIT
+        
+        # Update single repository
+        if update_repository "$name" "$CACHE_DIR" "$FORCE"; then
+            print_success "Repository update completed: $name"
+        else
+            log "ERROR" "Failed to update repository: $name"
+            exit 1
+        fi
+    else
+        log "INFO" "Updating all repositories"
+        
+        # Acquire cache lock
+        if ! acquire_cache_lock; then
+            log "ERROR" "Failed to acquire cache lock"
+            exit 1
+        fi
+        
+        # Ensure cleanup on exit
+        trap 'release_cache_lock' EXIT
+        
+        # Update all repositories
+        if update_all_repositories "$CACHE_DIR" "$FORCE"; then
+            print_success "All repositories updated successfully"
+        else
+            log "ERROR" "Some repositories failed to update"
+            exit 1
+        fi
+    fi
+}
+
+cmd_list() {
+    local format="${1:-full}"
+    
+    log "INFO" "Listing available scripts"
+    
+    # Discover scripts first
+    if ! discover_scripts; then
+        log "ERROR" "Failed to discover scripts"
+        exit 1
+    fi
+    
+    local total_scripts unique_scripts
+    total_scripts=$(get_script_count)
+    unique_scripts=$(get_unique_script_count)
+    
+    if [[ $total_scripts -eq 0 ]]; then
+        echo "No scripts found in cached repositories."
+        echo "Add repositories with bash scripts using 'qi add <url>'"
+        return 0
+    fi
+    
+    echo "Available scripts:"
+    echo "=================="
+    
+    case "$format" in
+        "names"|"name")
+            list_all_scripts "$CACHE_DIR" "name"
+            ;;
+        "repo"|"repos")
+            list_all_scripts "$CACHE_DIR" "repo"
+            ;;
+        *)
+            list_all_scripts "$CACHE_DIR" "full"
+            ;;
+    esac
+    
+    echo ""
+    echo "Total: $total_scripts scripts ($unique_scripts unique names)"
+    
+    if [[ $unique_scripts -lt $total_scripts ]]; then
+        local conflicts=$((total_scripts - unique_scripts))
+        echo "Note: $conflicts script(s) have name conflicts and will require selection"
+    fi
+}
+
+cmd_list_repos() {
+    log "INFO" "Listing cached repositories"
+    
+    local repos
+    mapfile -t repos < <(list_cached_repos)
+    
+    if [[ ${#repos[@]} -eq 0 ]]; then
+        echo "No repositories found in cache."
+        echo "Use 'qi add <url>' to add repositories."
+        return 0
+    fi
+    
+    echo "Cached repositories:"
+    echo "==================="
+    
+    for repo_name in "${repos[@]}"; do
+        local repo_url added_date status
+        repo_url=$(read_repo_metadata "$repo_name" "url" 2>/dev/null || echo "unknown")
+        added_date=$(read_repo_metadata "$repo_name" "added_date" 2>/dev/null || echo "unknown")
+        status=$(get_repository_status "$repo_name" 2>/dev/null || echo "unknown")
+        
+        # Format added date
+        local formatted_date
+        if [[ "$added_date" != "unknown" ]]; then
+            formatted_date=$(parse_timestamp "$added_date" "%Y-%m-%d" 2>/dev/null || echo "$added_date")
+        else
+            formatted_date="unknown"
+        fi
+        
+        # Color code status
+        local status_display
+        case "$status" in
+            "clean") status_display="$(print_color "$COLOR_GREEN" "✓ up-to-date")" ;;
+            "behind") status_display="$(print_color "$COLOR_YELLOW" "↓ behind")" ;;
+            "ahead") status_display="$(print_color "$COLOR_BLUE" "↑ ahead")" ;;
+            "modified") status_display="$(print_color "$COLOR_YELLOW" "✎ modified")" ;;
+            *) status_display="$(print_color "$COLOR_RED" "? $status")" ;;
+        esac
+        
+        echo ""
+        echo "Name:    $repo_name"
+        echo "URL:     $repo_url"
+        echo "Added:   $formatted_date"
+        echo "Status:  $status_display"
+    done
+    
+    echo ""
+    echo "Total: ${#repos[@]} repositories"
+}
+
+cmd_status() {
+    log "INFO" "Showing cache status"
+    
+    # Display cache statistics
+    get_cache_stats
+    
+    echo ""
+    
+    # Display repository status
+    local repos
+    mapfile -t repos < <(list_cached_repos)
+    
+    if [[ ${#repos[@]} -gt 0 ]]; then
+        echo "Repository Status:"
+        echo "=================="
+        
+        for repo_name in "${repos[@]}"; do
+            local status url branch
+            status=$(get_repository_status "$repo_name" 2>/dev/null || echo "unknown")
+            url=$(read_repo_metadata "$repo_name" "url" 2>/dev/null || echo "unknown")
+            branch=$(get_repository_branch "$repo_name" 2>/dev/null || echo "unknown")
+            
+            # Color code status
+            local status_display
+            case "$status" in
+                "clean") status_display="$(print_color "$COLOR_GREEN" "✓ up-to-date")" ;;
+                "behind") status_display="$(print_color "$COLOR_YELLOW" "↓ behind")" ;;
+                "ahead") status_display="$(print_color "$COLOR_BLUE" "↑ ahead")" ;;
+                "modified") status_display="$(print_color "$COLOR_YELLOW" "✎ modified")" ;;
+                *) status_display="$(print_color "$COLOR_RED" "? $status")" ;;
+            esac
+            
+            echo ""
+            echo "Repository: $repo_name"
+            echo "  URL:    $url"
+            echo "  Branch: $branch"
+            echo "  Status: $status_display"
+        done
+    fi
+    
+    echo ""
+    
+    # Display script index status
+    local script_index_file
+    script_index_file="$(get_script_index_file)"
+    
+    if [[ -f "$script_index_file" ]]; then
+        local index_age
+        index_age=$(( $(date +%s) - $(stat -c %Y "$script_index_file" 2>/dev/null || echo 0) ))
+        local age_display
+        age_display=$(time_diff 0 "$index_age")
+        
+        echo "Script Index:"
+        echo "============="
+        echo "Last updated: $age_display ago"
+        echo "Scripts indexed: $(get_script_count)"
+        echo "Unique scripts: $(get_unique_script_count)"
+        
+        if [[ $index_age -gt 300 ]]; then
+            echo "$(print_color "$COLOR_YELLOW" "Note: Index is older than 5 minutes, consider running 'qi list' to refresh")"
+        fi
+    else
+        echo "Script Index: Not created (run 'qi list' to create)"
+    fi
+}
+
+cmd_config() {
+    local action="${1:-show}"
+    
+    case "$action" in
+        "show")
+            show_config
+            ;;
+        "init")
+            create_default_config
+            ;;
+        *)
+            show_config
+            ;;
+    esac
+}
+
+cmd_execute_script() {
+    local script_name="$1"
+    shift
+    local script_args=("$@")
+    
+    log "INFO" "Executing script: $script_name"
+    if [[ ${#script_args[@]} -gt 0 ]]; then
+        log "DEBUG" "Script arguments: ${script_args[*]}"
+    fi
+    
+    # Execute the script
+    execute_script "$script_name" "${script_args[@]}"
+}
+
+# Error handling
+handle_error() {
+    local exit_code=$?
+    local line_number=$1
+    
+    log "ERROR" "An error occurred on line $line_number (exit code: $exit_code)"
+    exit $exit_code
+}
+
+# Set up error handling
+trap 'handle_error $LINENO' ERR
+
+# Run main function with all arguments
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
