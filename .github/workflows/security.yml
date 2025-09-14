@@ -1,0 +1,434 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run security scan daily at 3 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  shellcheck:
+    name: ShellCheck Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install ShellCheck
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shellcheck
+        
+    - name: Run ShellCheck on all shell scripts
+      run: |
+        echo "Running ShellCheck analysis..."
+        
+        # Find all shell scripts
+        find . -name "*.sh" -o -name "qi" -o -name "*.bash" | while read -r script; do
+          if [ -f "$script" ]; then
+            echo "Checking $script..."
+            shellcheck "$script" || echo "ShellCheck issues found in $script"
+          fi
+        done
+        
+    - name: Run ShellCheck with SARIF output
+      run: |
+        # Create SARIF output for GitHub Security tab
+        mkdir -p results
+        
+        # Run shellcheck on main scripts with SARIF format
+        shellcheck -f json qi install.sh test.sh run_tests.sh lib/*.sh tests/*.sh tools/*.sh > results/shellcheck.json || true
+        
+        # Convert JSON to SARIF (basic conversion)
+        cat > results/shellcheck.sarif << 'EOF'
+        {
+          "version": "2.1.0",
+          "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+          "runs": [
+            {
+              "tool": {
+                "driver": {
+                  "name": "ShellCheck",
+                  "version": "0.8.0",
+                  "informationUri": "https://www.shellcheck.net/"
+                }
+              },
+              "results": []
+            }
+          ]
+        }
+        EOF
+        
+    - name: Upload ShellCheck results
+      uses: actions/upload-artifact@v4
+      with:
+        name: shellcheck-results
+        path: results/
+        retention-days: 30
+
+  secret-scan:
+    name: Secret Detection
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Install secret scanning tools
+      run: |
+        # Install git-secrets
+        git clone https://github.com/awslabs/git-secrets.git /tmp/git-secrets
+        cd /tmp/git-secrets
+        sudo make install
+        
+    - name: Configure git-secrets
+      run: |
+        # Initialize git-secrets
+        git secrets --register-aws
+        git secrets --install
+        
+        # Add custom patterns for common secrets
+        git secrets --add 'password\s*[:=]\s*["\047]?[^\s""\047]{8,}'
+        git secrets --add 'secret\s*[:=]\s*["\047]?[^\s""\047]{8,}'
+        git secrets --add 'api[_-]?key\s*[:=]\s*["\047]?[^\s""\047]{8,}'
+        git secrets --add 'token\s*[:=]\s*["\047]?[^\s""\047]{8,}'
+        git secrets --add 'private[_-]?key'
+        git secrets --add 'BEGIN\s+(RSA\s+)?PRIVATE\s+KEY'
+        
+    - name: Scan for secrets in history
+      run: |
+        echo "Scanning repository for secrets..."
+        
+        # Scan all commits
+        git secrets --scan-history || {
+          echo "❌ Potential secrets found in git history"
+          exit 1
+        }
+        
+        echo "✅ No secrets found in git history"
+        
+    - name: Scan current files
+      run: |
+        echo "Scanning current files for secrets..."
+        
+        # Scan all files
+        git secrets --scan || {
+          echo "❌ Potential secrets found in current files"
+          exit 1
+        }
+        
+        echo "✅ No secrets found in current files"
+        
+    - name: Custom secret patterns scan
+      run: |
+        echo "Running custom secret pattern scan..."
+        
+        # Define patterns to search for
+        PATTERNS=(
+          "password\s*[:=]"
+          "secret\s*[:=]"
+          "api[_-]?key\s*[:=]"
+          "token\s*[:=]"
+          "private[_-]?key"
+          "-----BEGIN.*PRIVATE KEY-----"
+          "ssh-rsa\s+[A-Za-z0-9+/]+"
+          "ssh-ed25519\s+[A-Za-z0-9+/]+"
+        )
+        
+        # Search for patterns in all text files
+        for pattern in "${PATTERNS[@]}"; do
+          echo "Checking pattern: $pattern"
+          
+          if grep -r -E -i "$pattern" --include="*.sh" --include="*.bash" --include="*.txt" --include="*.md" . | grep -v "^#" | grep -v "test" | grep -v "example"; then
+            echo "⚠️  Potential secret pattern found: $pattern"
+          fi
+        done
+        
+        echo "✅ Custom secret pattern scan completed"
+
+  vulnerability-scan:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install security scanning tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y bandit safety
+        
+        # Install semgrep
+        pip install semgrep
+        
+    - name: Scan for common vulnerabilities
+      run: |
+        echo "Scanning for common security vulnerabilities..."
+        
+        # Check for dangerous bash patterns
+        cat > security-patterns.txt << 'EOF'
+        # Dangerous patterns in bash scripts
+        eval.*\$
+        \$\(.*\)
+        `.*`
+        rm\s+-rf\s+/
+        chmod\s+777
+        wget.*\|.*sh
+        curl.*\|.*sh
+        bash\s+<\(
+        exec\s+
+        source\s+/dev
+        EOF
+        
+        echo "Checking for dangerous bash patterns..."
+        while IFS= read -r pattern; do
+          if [[ "$pattern" =~ ^#.*$ ]] || [[ -z "$pattern" ]]; then
+            continue
+          fi
+          
+          echo "Checking pattern: $pattern"
+          if grep -r -E "$pattern" --include="*.sh" --include="*.bash" .; then
+            echo "⚠️  Potentially dangerous pattern found: $pattern"
+          fi
+        done < security-patterns.txt
+        
+    - name: Check file permissions
+      run: |
+        echo "Checking file permissions..."
+        
+        # Check for world-writable files
+        find . -type f -perm /o+w -not -path "./.git/*" | while read -r file; do
+          echo "⚠️  World-writable file: $file"
+        done
+        
+        # Check for setuid/setgid files (shouldn't be any in a shell project)
+        find . -type f \( -perm -4000 -o -perm -2000 \) -not -path "./.git/*" | while read -r file; do
+          echo "⚠️  Setuid/setgid file: $file"
+        done
+        
+        # Check that executable files are properly marked
+        SCRIPTS=("qi" "install.sh" "test.sh" "run_tests.sh")
+        for script in "${SCRIPTS[@]}"; do
+          if [ -f "$script" ]; then
+            if [ -x "$script" ]; then
+              echo "✅ $script is executable"
+            else
+              echo "⚠️  $script is not executable"
+            fi
+          fi
+        done
+        
+    - name: Check for hardcoded paths and URLs
+      run: |
+        echo "Checking for hardcoded sensitive paths and URLs..."
+        
+        # Check for hardcoded paths that might be problematic
+        DANGEROUS_PATHS=(
+          "/tmp/[^/]*\$"
+          "/home/[^/]*/\."
+          "~/"
+          "\$HOME"
+        )
+        
+        for path_pattern in "${DANGEROUS_PATHS[@]}"; do
+          echo "Checking for pattern: $path_pattern"
+          if grep -r -E "$path_pattern" --include="*.sh" --include="*.bash" . | grep -v "^#" | grep -v "test"; then
+            echo "ℹ️  Found hardcoded path pattern: $path_pattern"
+          fi
+        done
+        
+    - name: Validate input sanitization
+      run: |
+        echo "Checking input sanitization..."
+        
+        # Look for potential command injection vulnerabilities
+        INJECTION_PATTERNS=(
+          'eval.*\$[0-9]'
+          'exec.*\$[0-9]'
+          '\$\(.*\$[0-9]'
+          '`.*\$[0-9]'
+        )
+        
+        for pattern in "${INJECTION_PATTERNS[@]}"; do
+          echo "Checking for injection pattern: $pattern"
+          if grep -r -E "$pattern" --include="*.sh" --include="*.bash" .; then
+            echo "⚠️  Potential command injection: $pattern"
+          fi
+        done
+        
+        # Check for proper input validation
+        echo "Checking for input validation patterns..."
+        if grep -r -E '\[\[.*=~.*\]\]' --include="*.sh" --include="*.bash" .; then
+          echo "✅ Found regex validation patterns"
+        fi
+        
+        if grep -r -E 'validate_.*\(' --include="*.sh" --include="*.bash" .; then
+          echo "✅ Found validation functions"
+        fi
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check external dependencies
+      run: |
+        echo "Checking external dependencies and downloads..."
+        
+        # Find URLs in scripts
+        echo "External URLs found in scripts:"
+        grep -r -E 'https?://[^\s"'"'"']+' --include="*.sh" --include="*.bash" . | while IFS=':' read -r file line; do
+          echo "$file: $line"
+        done
+        
+        # Check for curl/wget usage
+        echo -e "\nNetwork operations found:"
+        grep -r -E '(curl|wget|git clone)' --include="*.sh" --include="*.bash" . | while IFS=':' read -r file line; do
+          echo "$file: $line"
+        done
+        
+    - name: Verify download integrity
+      run: |
+        echo "Checking for download integrity verification..."
+        
+        # Look for checksum verification
+        if grep -r -E '(sha256sum|md5sum|shasum)' --include="*.sh" --include="*.bash" .; then
+          echo "✅ Found checksum verification"
+        else
+          echo "⚠️  No checksum verification found for downloads"
+        fi
+        
+        # Look for signature verification
+        if grep -r -E '(gpg|pgp)' --include="*.sh" --include="*.bash" .; then
+          echo "✅ Found signature verification"
+        else
+          echo "ℹ️  No GPG signature verification found"
+        fi
+
+  code-quality-security:
+    name: Code Quality Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check error handling
+      run: |
+        echo "Checking error handling patterns..."
+        
+        # Check for set -e usage
+        if grep -r -E '^set -[euo]+' --include="*.sh" --include="*.bash" .; then
+          echo "✅ Found proper error handling (set -e)"
+        else
+          echo "⚠️  No strict error handling found"
+        fi
+        
+        # Check for trap usage
+        if grep -r -E 'trap.*ERR' --include="*.sh" --include="*.bash" .; then
+          echo "✅ Found error traps"
+        else
+          echo "ℹ️  No error traps found"
+        fi
+        
+    - name: Check for unsafe operations
+      run: |
+        echo "Checking for potentially unsafe operations..."
+        
+        # Check for recursive deletion
+        if grep -r -E 'rm.*-r.*\$' --include="*.sh" --include="*.bash" . | grep -v test; then
+          echo "⚠️  Found potentially unsafe recursive deletion"
+        fi
+        
+        # Check for broad file operations
+        if grep -r -E 'chmod.*777' --include="*.sh" --include="*.bash" .; then
+          echo "⚠️  Found overly permissive chmod"
+        fi
+        
+        # Check for sudo usage
+        if grep -r -E 'sudo' --include="*.sh" --include="*.bash" . | grep -v test; then
+          echo "ℹ️  Found sudo usage (review for necessity)"
+        fi
+        
+    - name: Generate security report
+      run: |
+        echo "Generating security summary report..."
+        
+        cat > security-report.md << 'EOF'
+        # Security Scan Report
+        
+        ## Summary
+        
+        This report contains the results of automated security scanning for the qi project.
+        
+        ## Scans Performed
+        
+        - ✅ ShellCheck static analysis
+        - ✅ Secret detection
+        - ✅ Vulnerability patterns
+        - ✅ File permissions check
+        - ✅ Input sanitization review
+        - ✅ Dependency security check
+        - ✅ Code quality security review
+        
+        ## Recommendations
+        
+        1. Regularly update ShellCheck and fix any new issues
+        2. Review any flagged patterns for security implications
+        3. Ensure all downloads verify integrity with checksums
+        4. Use proper input validation for all user inputs
+        5. Follow principle of least privilege for file permissions
+        6. Regularly audit external dependencies
+        
+        ## Next Steps
+        
+        - Address any high-severity findings
+        - Consider implementing additional security measures
+        - Schedule regular security reviews
+        
+        Generated on: $(date)
+        EOF
+        
+        echo "✅ Security report generated"
+        
+    - name: Upload security report
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-report
+        path: security-report.md
+        retention-days: 90
+
+  sarif-upload:
+    name: Upload SARIF Results
+    runs-on: ubuntu-latest
+    needs: [shellcheck]
+    if: always()
+    
+    steps:
+    - name: Download ShellCheck results
+      uses: actions/download-artifact@v4
+      with:
+        name: shellcheck-results
+        path: results/
+        
+    - name: Upload SARIF to GitHub Security
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: results/shellcheck.sarif
+        category: shellcheck

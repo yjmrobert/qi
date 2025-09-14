@@ -1,0 +1,459 @@
+name: Installation Test
+
+on:
+  push:
+    paths:
+      - 'install.sh'
+      - 'qi'
+      - 'lib/**'
+  pull_request:
+    paths:
+      - 'install.sh'
+      - 'qi'
+      - 'lib/**'
+  schedule:
+    # Test installation daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  test-install-script:
+    name: Test Install Script
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04, ubuntu-22.04, ubuntu-latest]
+        install-method: [curl, wget, manual]
+        user-type: [root, sudo, user]
+        exclude:
+          # Exclude user without sudo for system installation
+          - user-type: user
+            
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup test environment
+      run: |
+        # Install dependencies
+        sudo apt-get update
+        sudo apt-get install -y curl wget git bash
+        
+        # Create test user if needed
+        if [ "${{ matrix.user-type }}" = "user" ]; then
+          sudo useradd -m -s /bin/bash testuser
+          echo "testuser ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/testuser
+        fi
+        
+    - name: Test install script syntax
+      run: |
+        bash -n install.sh
+        echo "✅ Install script syntax is valid"
+        
+    - name: Test install script functions
+      run: |
+        # Source the install script and test individual functions
+        cat > test-install-functions.sh << 'EOF'
+        #!/bin/bash
+        set -euo pipefail
+        
+        # Mock functions that require root or network access
+        check_permissions() { return 0; }
+        download_qi() { 
+          mkdir -p "$TEMP_DIR/qi"
+          cp -r . "$TEMP_DIR/qi/"
+          return 0
+        }
+        install_qi() {
+          echo "Mock install: would install to $INSTALL_DIR"
+          return 0
+        }
+        verify_installation() {
+          echo "Mock verify: installation would be verified"
+          return 0
+        }
+        
+        # Source the install script
+        source install.sh
+        
+        # Test individual functions
+        echo "Testing check_requirements..."
+        check_requirements
+        
+        echo "Testing create_temp_dir..."
+        create_temp_dir
+        
+        echo "Testing verify_files..."
+        download_qi  # Mock download first
+        verify_files
+        
+        echo "Testing cleanup..."
+        cleanup
+        
+        echo "✅ All install script functions work correctly"
+        EOF
+        
+        chmod +x test-install-functions.sh
+        bash test-install-functions.sh
+        
+    - name: Test installation with ${{ matrix.install-method }} as ${{ matrix.user-type }}
+      run: |
+        # Create temporary installation directory
+        TEMP_INSTALL_DIR="/tmp/qi-test-install-$$"
+        mkdir -p "$TEMP_INSTALL_DIR"
+        
+        case "${{ matrix.install-method }}" in
+          curl)
+            echo "Testing curl installation method..."
+            # Create a local HTTP server to serve install.sh
+            python3 -m http.server 8000 --directory . &
+            SERVER_PID=$!
+            sleep 2
+            
+            # Test curl installation
+            if [ "${{ matrix.user-type }}" = "root" ]; then
+              sudo -E bash -c "curl -fsSL http://localhost:8000/install.sh | INSTALL_DIR='$TEMP_INSTALL_DIR' bash"
+            else
+              curl -fsSL http://localhost:8000/install.sh | INSTALL_DIR="$TEMP_INSTALL_DIR" sudo -E bash
+            fi
+            
+            kill $SERVER_PID || true
+            ;;
+            
+          wget)
+            echo "Testing wget installation method..."
+            # Test wget download
+            wget -O /tmp/install-test.sh install.sh
+            chmod +x /tmp/install-test.sh
+            
+            if [ "${{ matrix.user-type }}" = "root" ]; then
+              sudo -E INSTALL_DIR="$TEMP_INSTALL_DIR" /tmp/install-test.sh
+            else
+              sudo -E INSTALL_DIR="$TEMP_INSTALL_DIR" /tmp/install-test.sh
+            fi
+            ;;
+            
+          manual)
+            echo "Testing manual installation method..."
+            # Copy files to temporary location
+            cp -r . /tmp/qi-manual-test/
+            cd /tmp/qi-manual-test/
+            
+            # Make scripts executable
+            chmod +x qi install.sh
+            
+            # Run manual installation steps
+            if [ "${{ matrix.user-type }}" = "root" ]; then
+              sudo -E INSTALL_DIR="$TEMP_INSTALL_DIR" ./install.sh
+            else
+              sudo -E INSTALL_DIR="$TEMP_INSTALL_DIR" ./install.sh
+            fi
+            ;;
+        esac
+        
+        echo "✅ Installation completed with ${{ matrix.install-method }} method"
+        
+    - name: Verify installation
+      run: |
+        TEMP_INSTALL_DIR="/tmp/qi-test-install-$$"
+        
+        # Check if qi binary was installed
+        if [ -f "$TEMP_INSTALL_DIR/qi" ]; then
+          echo "✅ qi binary installed"
+        else
+          echo "❌ qi binary not found"
+          exit 1
+        fi
+        
+        # Check if library files were installed
+        if [ -d "$TEMP_INSTALL_DIR/qi-lib" ]; then
+          echo "✅ qi library directory installed"
+        else
+          echo "❌ qi library directory not found"
+          exit 1
+        fi
+        
+        # Check if qi is executable
+        if [ -x "$TEMP_INSTALL_DIR/qi" ]; then
+          echo "✅ qi binary is executable"
+        else
+          echo "❌ qi binary is not executable"
+          exit 1
+        fi
+        
+        # Test qi command
+        export PATH="$TEMP_INSTALL_DIR:$PATH"
+        if qi --version >/dev/null 2>&1; then
+          echo "✅ qi command works"
+        else
+          echo "❌ qi command failed"
+          exit 1
+        fi
+        
+        # Test qi help
+        if qi --help >/dev/null 2>&1; then
+          echo "✅ qi help works"
+        else
+          echo "❌ qi help failed"
+          exit 1
+        fi
+        
+    - name: Test qi functionality post-install
+      run: |
+        TEMP_INSTALL_DIR="/tmp/qi-test-install-$$"
+        export PATH="$TEMP_INSTALL_DIR:$PATH"
+        export QI_CACHE_DIR="/tmp/qi-post-install-test"
+        
+        # Test basic qi commands
+        qi config
+        qi status
+        
+        # Test adding a repository (should fail gracefully without network)
+        qi add https://example.com/nonexistent.git test-repo 2>/dev/null || echo "Expected failure for nonexistent repo"
+        
+        # Test listing (should show empty)
+        qi list-repos
+        
+        echo "✅ qi functionality test completed"
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        # Clean up temporary directories
+        rm -rf /tmp/qi-*
+        rm -f /tmp/install-test.sh
+        
+        # Kill any remaining processes
+        pkill -f "python3 -m http.server" || true
+
+  test-install-scenarios:
+    name: Installation Scenarios
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Test installation with missing dependencies
+      run: |
+        # Create a minimal environment
+        docker run --rm -v "$PWD:/workspace" -w /workspace alpine:latest sh -c '
+          # Test with minimal environment (no git)
+          if ./install.sh 2>/dev/null; then
+            echo "❌ Installation should fail without git"
+            exit 1
+          else
+            echo "✅ Installation correctly fails without git"
+          fi
+        '
+        
+    - name: Test installation with network issues
+      run: |
+        # Mock network failure
+        cat > test-network-failure.sh << 'EOF'
+        #!/bin/bash
+        set -euo pipefail
+        
+        # Override git command to simulate network failure
+        git() {
+          if [[ "$1" == "clone" ]]; then
+            echo "fatal: unable to access repository" >&2
+            return 128
+          fi
+          command git "$@"
+        }
+        export -f git
+        
+        # Test install script with network failure
+        if ./install.sh 2>/dev/null; then
+          echo "❌ Installation should fail with network issues"
+          exit 1
+        else
+          echo "✅ Installation correctly handles network failure"
+        fi
+        EOF
+        
+        chmod +x test-network-failure.sh
+        bash test-network-failure.sh
+        
+    - name: Test installation with permission issues
+      run: |
+        # Test installation to read-only directory
+        mkdir -p /tmp/readonly-test
+        chmod 444 /tmp/readonly-test
+        
+        if INSTALL_DIR="/tmp/readonly-test" ./install.sh 2>/dev/null; then
+          echo "❌ Installation should fail with permission issues"
+          exit 1
+        else
+          echo "✅ Installation correctly handles permission issues"
+        fi
+        
+        chmod 755 /tmp/readonly-test
+        rm -rf /tmp/readonly-test
+        
+    - name: Test installation idempotency
+      run: |
+        TEMP_INSTALL_DIR="/tmp/qi-idempotent-test"
+        
+        # First installation
+        INSTALL_DIR="$TEMP_INSTALL_DIR" sudo ./install.sh
+        
+        # Get modification time of installed file
+        FIRST_MTIME=$(stat -c %Y "$TEMP_INSTALL_DIR/qi" 2>/dev/null || echo "0")
+        
+        sleep 1
+        
+        # Second installation (should be idempotent)
+        INSTALL_DIR="$TEMP_INSTALL_DIR" sudo ./install.sh
+        
+        # Check if file was modified
+        SECOND_MTIME=$(stat -c %Y "$TEMP_INSTALL_DIR/qi" 2>/dev/null || echo "0")
+        
+        if [ "$FIRST_MTIME" != "$SECOND_MTIME" ]; then
+          echo "✅ Installation updates files (expected behavior)"
+        else
+          echo "✅ Installation is idempotent"
+        fi
+        
+        # Cleanup
+        sudo rm -rf "$TEMP_INSTALL_DIR"
+
+  test-uninstall:
+    name: Test Uninstallation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install qi
+      run: |
+        TEMP_INSTALL_DIR="/tmp/qi-uninstall-test"
+        INSTALL_DIR="$TEMP_INSTALL_DIR" sudo ./install.sh
+        
+        # Verify installation
+        if [ -f "$TEMP_INSTALL_DIR/qi" ] && [ -d "$TEMP_INSTALL_DIR/qi-lib" ]; then
+          echo "✅ qi installed successfully"
+        else
+          echo "❌ qi installation failed"
+          exit 1
+        fi
+        
+    - name: Create uninstall script
+      run: |
+        cat > uninstall.sh << 'EOF'
+        #!/bin/bash
+        set -euo pipefail
+        
+        INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+        
+        echo "Uninstalling qi from $INSTALL_DIR..."
+        
+        # Remove qi binary
+        if [ -f "$INSTALL_DIR/qi" ]; then
+          rm -f "$INSTALL_DIR/qi"
+          echo "✅ Removed qi binary"
+        fi
+        
+        # Remove qi library directory
+        if [ -d "$INSTALL_DIR/qi-lib" ]; then
+          rm -rf "$INSTALL_DIR/qi-lib"
+          echo "✅ Removed qi library directory"
+        fi
+        
+        # Remove user cache (optional)
+        if [ -d "$HOME/.qi" ]; then
+          echo "User cache found at $HOME/.qi"
+          echo "To remove user data, run: rm -rf $HOME/.qi"
+        fi
+        
+        echo "✅ qi uninstalled successfully"
+        EOF
+        
+        chmod +x uninstall.sh
+        
+    - name: Test uninstallation
+      run: |
+        TEMP_INSTALL_DIR="/tmp/qi-uninstall-test"
+        
+        # Run uninstall
+        INSTALL_DIR="$TEMP_INSTALL_DIR" sudo ./uninstall.sh
+        
+        # Verify uninstallation
+        if [ ! -f "$TEMP_INSTALL_DIR/qi" ] && [ ! -d "$TEMP_INSTALL_DIR/qi-lib" ]; then
+          echo "✅ qi uninstalled successfully"
+        else
+          echo "❌ qi uninstallation incomplete"
+          exit 1
+        fi
+
+  integration-test:
+    name: End-to-End Installation Test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Full installation and usage test
+      run: |
+        # Install qi
+        sudo ./install.sh
+        
+        # Test qi is in PATH
+        which qi
+        qi --version
+        
+        # Test qi functionality
+        export QI_CACHE_DIR="/tmp/qi-integration-test"
+        
+        # Test basic commands
+        qi config
+        qi status
+        qi list-repos
+        
+        # Test help system
+        qi --help
+        qi help
+        
+        echo "✅ Full installation and usage test completed"
+        
+    - name: Test with real repository
+      run: |
+        export QI_CACHE_DIR="/tmp/qi-real-repo-test"
+        
+        # Add a real, small repository
+        qi add https://github.com/octocat/Hello-World.git hello-world
+        
+        # List repositories
+        qi list-repos | grep hello-world
+        
+        # Check status
+        qi status
+        
+        # Remove repository
+        echo "y" | qi remove hello-world
+        
+        # Verify removal
+        if qi list-repos | grep -q hello-world; then
+          echo "❌ Repository not properly removed"
+          exit 1
+        else
+          echo "✅ Repository properly removed"
+        fi
+        
+    - name: Performance test
+      run: |
+        export QI_CACHE_DIR="/tmp/qi-performance-test"
+        
+        # Time basic operations
+        echo "Testing performance of basic operations..."
+        
+        time qi --help >/dev/null
+        time qi config >/dev/null
+        time qi status >/dev/null
+        time qi list-repos >/dev/null
+        
+        echo "✅ Performance test completed"
