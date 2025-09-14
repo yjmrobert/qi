@@ -1,0 +1,69 @@
+---
+name: Mark Stale Issues and PRs
+
+on:
+  schedule:
+    # Run daily at 1 AM UTC
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      
+    steps:
+    - uses: actions/stale@v8
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        
+        # Issues
+        stale-issue-message: |
+          This issue has been automatically marked as stale because it has not had recent activity. 
+          It will be closed if no further activity occurs. Thank you for your contributions.
+          
+          If you believe this issue is still relevant, please:
+          - Add a comment explaining why it should remain open
+          - Remove the "stale" label
+          - Provide any additional context or updates
+        close-issue-message: |
+          This issue was automatically closed because it has been stale for too long with no activity.
+          
+          If you believe this issue should be reopened, please:
+          - Create a new issue with updated information
+          - Reference this closed issue in your new issue
+          - Provide current context and reproduction steps
+        days-before-issue-stale: 60
+        days-before-issue-close: 14
+        stale-issue-label: 'stale'
+        exempt-issue-labels: 'pinned,security,enhancement,bug,good first issue'
+        
+        # Pull Requests
+        stale-pr-message: |
+          This pull request has been automatically marked as stale because it has not had recent activity.
+          It will be closed if no further activity occurs. Thank you for your contributions.
+          
+          If this PR is still relevant, please:
+          - Rebase against the latest main branch
+          - Address any review comments
+          - Add a comment explaining the current status
+          - Remove the "stale" label
+        close-pr-message: |
+          This pull request was automatically closed because it has been stale for too long with no activity.
+          
+          If you'd like to continue with this change:
+          - Create a new pull request with updated code
+          - Reference this closed PR in your new PR description
+          - Ensure your branch is up to date with main
+        days-before-pr-stale: 30
+        days-before-pr-close: 7
+        stale-pr-label: 'stale'
+        exempt-pr-labels: 'pinned,security,work-in-progress'
+        
+        # General settings
+        ascending: true
+        operations-per-run: 30
+        remove-stale-when-updated: true
+        debug-only: false

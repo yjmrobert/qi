@@ -1,0 +1,464 @@
+---
+name: Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    name: ShellCheck Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install ShellCheck
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y shellcheck
+        shellcheck --version
+        
+    - name: Lint shell scripts with ShellCheck
+      run: |
+        echo "Running ShellCheck on all shell scripts..."
+        
+        # Find all shell scripts and lint them
+        EXIT_CODE=0
+        
+        # Main scripts
+        for script in qi install.sh test.sh run_tests.sh; do
+          if [ -f "$script" ]; then
+            echo "Linting $script..."
+            if ! shellcheck "$script"; then
+              EXIT_CODE=1
+              echo "❌ ShellCheck failed for $script"
+            else
+              echo "✅ $script passed ShellCheck"
+            fi
+          fi
+        done
+        
+        # Library scripts
+        if [ -d "lib" ]; then
+          for script in lib/*.sh; do
+            if [ -f "$script" ]; then
+              echo "Linting $script..."
+              if ! shellcheck "$script"; then
+                EXIT_CODE=1
+                echo "❌ ShellCheck failed for $script"
+              else
+                echo "✅ $script passed ShellCheck"
+              fi
+            fi
+          done
+        fi
+        
+        # Test scripts
+        if [ -d "tests" ]; then
+          for script in tests/*.sh; do
+            if [ -f "$script" ]; then
+              echo "Linting $script..."
+              if ! shellcheck "$script"; then
+                EXIT_CODE=1
+                echo "❌ ShellCheck failed for $script"
+              else
+                echo "✅ $script passed ShellCheck"
+              fi
+            fi
+          done
+        fi
+        
+        # Tool scripts
+        if [ -d "tools" ]; then
+          for script in tools/*.sh; do
+            if [ -f "$script" ]; then
+              echo "Linting $script..."
+              if ! shellcheck "$script"; then
+                EXIT_CODE=1
+                echo "❌ ShellCheck failed for $script"
+              else
+                echo "✅ $script passed ShellCheck"
+              fi
+            fi
+          done
+        fi
+        
+        exit $EXIT_CODE
+
+  bash-syntax:
+    name: Bash Syntax Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        bash-version: ['4.4', '5.0', '5.1', '5.2']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Bash ${{ matrix.bash-version }}
+      run: |
+        if [ "${{ matrix.bash-version }}" = "5.2" ]; then
+          # Use system bash for 5.2 (latest)
+          sudo ln -sf /bin/bash /usr/local/bin/bash-${{ matrix.bash-version }}
+          echo "Using system bash $(bash --version | head -1)"
+        else
+          # For older versions, use system bash for compatibility
+          echo "Using system bash for compatibility testing"
+          sudo ln -sf /bin/bash /usr/local/bin/bash-${{ matrix.bash-version }}
+          echo "Note: Using system bash for version ${{ matrix.bash-version }} compatibility test"
+        fi
+        
+    - name: Check syntax with Bash ${{ matrix.bash-version }}
+      run: |
+        echo "Checking syntax with Bash ${{ matrix.bash-version }}..."
+        export PATH="/usr/local/bin/bash-${{ matrix.bash-version }}:$PATH"
+        
+        EXIT_CODE=0
+        
+        # Check all shell scripts
+        for script in qi install.sh test.sh run_tests.sh lib/*.sh tests/*.sh tools/*.sh; do
+          if [ -f "$script" ]; then
+            echo "Checking syntax: $script"
+            if ! bash-${{ matrix.bash-version }} -n "$script"; then
+              echo "❌ Syntax error in $script with Bash ${{ matrix.bash-version }}"
+              EXIT_CODE=1
+            else
+              echo "✅ $script syntax OK with Bash ${{ matrix.bash-version }}"
+            fi
+          fi
+        done
+        
+        exit $EXIT_CODE
+
+  style-check:
+    name: Shell Style Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install shfmt
+      run: |
+        # Install shfmt for shell formatting
+        curl -L https://github.com/mvdan/sh/releases/download/v3.7.0/shfmt_v3.7.0_linux_amd64 -o shfmt
+        chmod +x shfmt
+        sudo mv shfmt /usr/local/bin/
+        shfmt --version
+        
+    - name: Check shell script formatting
+      run: |
+        echo "Checking shell script formatting with shfmt..."
+        
+        # Check formatting (don't modify, just check)
+        EXIT_CODE=0
+        
+        for script in qi install.sh test.sh run_tests.sh lib/*.sh tests/*.sh tools/*.sh; do
+          if [ -f "$script" ]; then
+            echo "Checking formatting: $script"
+            
+            # Check if file would be changed by shfmt
+            if ! shfmt -d -i 4 -ci "$script"; then
+              echo "⚠️  $script has formatting issues"
+              EXIT_CODE=1
+            else
+              echo "✅ $script formatting is correct"
+            fi
+          fi
+        done
+        
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo ""
+          echo "To fix formatting issues, run:"
+          echo "  shfmt -w -i 4 -ci qi install.sh test.sh run_tests.sh lib/*.sh tests/*.sh tools/*.sh"
+        fi
+        
+        exit $EXIT_CODE
+
+  best-practices:
+    name: Shell Best Practices
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Check shell script best practices
+      run: |
+        echo "Checking shell script best practices..."
+        
+        EXIT_CODE=0
+        
+        # Check for shebang lines
+        echo "=== Checking shebang lines ==="
+        for script in qi install.sh test.sh run_tests.sh lib/*.sh tests/*.sh tools/*.sh; do
+          if [ -f "$script" ]; then
+            if head -1 "$script" | grep -q "^#!/"; then
+              echo "✅ $script has shebang"
+            else
+              echo "❌ $script missing shebang"
+              EXIT_CODE=1
+            fi
+          fi
+        done
+        
+        # Check for set -euo pipefail
+        echo -e "\n=== Checking error handling ==="
+        for script in qi install.sh test.sh run_tests.sh; do
+          if [ -f "$script" ]; then
+            if grep -q "set -euo pipefail\|set -[euo]*e[euo]*\|set -[euo]*u[euo]*\|set -[euo]*o[euo]*" "$script"; then
+              echo "✅ $script has proper error handling"
+            else
+              echo "⚠️  $script missing 'set -euo pipefail'"
+            fi
+          fi
+        done
+        
+        # Check for function documentation
+        echo -e "\n=== Checking function documentation ==="
+        for script in qi lib/*.sh; do
+          if [ -f "$script" ]; then
+            FUNCTIONS=$(grep -c "^[a-zA-Z_][a-zA-Z0-9_]*\s*()" "$script" 2>/dev/null || echo 0)
+            COMMENTS=$(grep -c "^#.*" "$script" 2>/dev/null || echo 0)
+            
+            if [ "$FUNCTIONS" -gt 0 ]; then
+              if [ "$COMMENTS" -gt "$FUNCTIONS" ]; then
+                echo "✅ $script appears to have good documentation"
+              else
+                echo "⚠️  $script may need more documentation ($FUNCTIONS functions, $COMMENTS comment lines)"
+              fi
+            fi
+          fi
+        done
+        
+        # Check for proper quoting
+        echo -e "\n=== Checking variable quoting ==="
+        for script in qi install.sh test.sh run_tests.sh lib/*.sh; do
+          if [ -f "$script" ]; then
+            # Look for unquoted variables (basic check)
+            UNQUOTED=$(grep -c '\$[A-Za-z_][A-Za-z0-9_]*[^"]' "$script" 2>/dev/null || echo 0)
+            QUOTED=$(grep -c '"\$[A-Za-z_][A-Za-z0-9_]*"' "$script" 2>/dev/null || echo 0)
+            
+            if [ "$QUOTED" -gt "$UNQUOTED" ]; then
+              echo "✅ $script has good variable quoting"
+            else
+              echo "⚠️  $script may have unquoted variables"
+            fi
+          fi
+        done
+        
+        # Check for hardcoded values
+        echo -e "\n=== Checking for hardcoded values ==="
+        for script in qi install.sh; do
+          if [ -f "$script" ]; then
+            if grep -q "/usr/local/bin\|/tmp\|/home" "$script"; then
+              echo "ℹ️  $script contains hardcoded paths (review if appropriate)"
+            fi
+          fi
+        done
+        
+        # Check for TODO/FIXME comments
+        echo -e "\n=== Checking for TODO/FIXME comments ==="
+        for script in qi install.sh test.sh run_tests.sh lib/*.sh tests/*.sh tools/*.sh; do
+          if [ -f "$script" ]; then
+            TODO_COUNT=$(grep -ci "todo\|fixme\|hack\|xxx" "$script" 2>/dev/null || echo 0)
+            if [ "$TODO_COUNT" -gt 0 ]; then
+              echo "ℹ️  $script has $TODO_COUNT TODO/FIXME comments"
+              grep -ni "todo\|fixme\|hack\|xxx" "$script" | head -5
+            fi
+          fi
+        done
+        
+        exit $EXIT_CODE
+
+  documentation-lint:
+    name: Documentation Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install markdownlint
+      run: |
+        npm install -g markdownlint-cli
+        markdownlint --version
+        
+    - name: Lint Markdown files
+      run: |
+        echo "Linting Markdown files..."
+        
+        # Create markdownlint config
+        cat > .markdownlint.json << 'EOF'
+        {
+          "MD013": { "line_length": 120 },
+          "MD033": false,
+          "MD041": false
+        }
+        EOF
+        
+        # Lint all markdown files
+        if ! markdownlint *.md; then
+          echo "❌ Markdown linting failed"
+          exit 1
+        else
+          echo "✅ Markdown files passed linting"
+        fi
+        
+    - name: Check README completeness
+      run: |
+        echo "Checking README completeness..."
+        
+        REQUIRED_SECTIONS=(
+          "Installation"
+          "Usage"
+          "Examples"
+          "Contributing"
+        )
+        
+        MISSING_SECTIONS=()
+        
+        for section in "${REQUIRED_SECTIONS[@]}"; do
+          if ! grep -qi "## $section\|# $section" README.md; then
+            MISSING_SECTIONS+=("$section")
+          fi
+        done
+        
+        if [ ${#MISSING_SECTIONS[@]} -gt 0 ]; then
+          echo "⚠️  README.md missing sections: ${MISSING_SECTIONS[*]}"
+        else
+          echo "✅ README.md has all required sections"
+        fi
+        
+    - name: Check for broken links
+      run: |
+        echo "Checking for broken internal links..."
+        
+        # Extract internal links from markdown files
+        grep -h -o '\[.*\](.*\.md\|#.*\|\.\/.*\|\/.*\)' *.md 2>/dev/null | while IFS= read -r link; do
+          # Extract the URL part
+          url=$(echo "$link" | sed 's/.*](\([^)]*\)).*/\1/')
+          
+          # Skip external URLs
+          if [[ "$url" =~ ^https?:// ]]; then
+            continue
+          fi
+          
+          # Check if it's a file reference
+          if [[ "$url" =~ \.(md|sh|txt)$ ]]; then
+            if [ ! -f "$url" ]; then
+              echo "⚠️  Broken file link: $link"
+            fi
+          fi
+        done
+
+  yaml-lint:
+    name: YAML Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install yamllint
+      run: |
+        pip install yamllint
+        yamllint --version
+        
+    - name: Lint YAML files
+      run: |
+        echo "Linting YAML files..."
+        
+        # Create yamllint config
+        cat > .yamllint.yml << 'EOF'
+        ---
+        extends: default
+        rules:
+          line-length:
+            max: 120
+          comments:
+            min-spaces-from-content: 1
+          document-start: disable
+          truthy:
+            allowed-values: ['true', 'false', 'on', 'off']
+        EOF
+        
+        # Lint all YAML files
+        find . -name "*.yml" -o -name "*.yaml" | while read -r yaml_file; do
+          echo "Linting $yaml_file..."
+          if ! yamllint "$yaml_file"; then
+            echo "❌ YAML linting failed for $yaml_file"
+            exit 1
+          else
+            echo "✅ $yaml_file passed YAML linting"
+          fi
+        done
+
+  lint-summary:
+    name: Linting Summary
+    runs-on: ubuntu-latest
+    needs: [shellcheck, bash-syntax, style-check, best-practices, documentation-lint, yaml-lint]
+    if: always()
+    
+    steps:
+    - name: Generate lint summary
+      run: |
+        echo "# Linting Summary" > lint-summary.md
+        echo "" >> lint-summary.md
+        echo "## Results" >> lint-summary.md
+        echo "" >> lint-summary.md
+        
+        # Check job results
+        if [ "${{ needs.shellcheck.result }}" = "success" ]; then
+          echo "- ✅ ShellCheck: PASSED" >> lint-summary.md
+        else
+          echo "- ❌ ShellCheck: FAILED" >> lint-summary.md
+        fi
+        
+        if [ "${{ needs.bash-syntax.result }}" = "success" ]; then
+          echo "- ✅ Bash Syntax: PASSED" >> lint-summary.md
+        else
+          echo "- ❌ Bash Syntax: FAILED" >> lint-summary.md
+        fi
+        
+        if [ "${{ needs.style-check.result }}" = "success" ]; then
+          echo "- ✅ Style Check: PASSED" >> lint-summary.md
+        else
+          echo "- ❌ Style Check: FAILED" >> lint-summary.md
+        fi
+        
+        if [ "${{ needs.best-practices.result }}" = "success" ]; then
+          echo "- ✅ Best Practices: PASSED" >> lint-summary.md
+        else
+          echo "- ❌ Best Practices: FAILED" >> lint-summary.md
+        fi
+        
+        if [ "${{ needs.documentation-lint.result }}" = "success" ]; then
+          echo "- ✅ Documentation: PASSED" >> lint-summary.md
+        else
+          echo "- ❌ Documentation: FAILED" >> lint-summary.md
+        fi
+        
+        if [ "${{ needs.yaml-lint.result }}" = "success" ]; then
+          echo "- ✅ YAML Lint: PASSED" >> lint-summary.md
+        else
+          echo "- ❌ YAML Lint: FAILED" >> lint-summary.md
+        fi
+        
+        echo "" >> lint-summary.md
+        echo "Generated on: $(date)" >> lint-summary.md
+        
+        cat lint-summary.md
+        
+    - name: Upload lint summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: lint-summary
+        path: lint-summary.md
+        retention-days: 30
