@@ -26,7 +26,7 @@ print_color() {
 # Initialize coverage tracking
 init_coverage() {
     mkdir -p "$COVERAGE_DIR"
-    true > "$COVERAGE_DATA_FILE"
+    true >"$COVERAGE_DATA_FILE"
     print_color "$BLUE" "Coverage tracking initialized in $COVERAGE_DIR"
 }
 
@@ -35,16 +35,16 @@ run_with_coverage() {
     local script="$1"
     shift
     local args=("$@")
-    
+
     print_color "$BLUE" "Running $script with simple coverage tracking..."
-    
+
     # Record that this script was executed
-    echo "$script:executed" >> "$COVERAGE_DATA_FILE"
-    
+    echo "$script:executed" >>"$COVERAGE_DATA_FILE"
+
     # Run the script normally
     local exit_code=0
     bash "$script" "${args[@]}" || exit_code=$?
-    
+
     return $exit_code
 }
 
@@ -54,37 +54,37 @@ analyze_coverage() {
         print_color "$RED" "No coverage data found. Run tests first."
         return 1
     fi
-    
+
     print_color "$BLUE" "Analyzing coverage data..."
-    
+
     # Get unique files covered
     local files
     mapfile -t files < <(cut -d: -f1 "$COVERAGE_DATA_FILE" | sort -u)
-    
+
     local total_files=${#files[@]}
     local covered_files=$total_files
-    
+
     echo "Coverage Report"
     echo "=============="
     echo ""
-    
+
     for file in "${files[@]}"; do
         if [[ ! -f "$file" ]]; then
             continue
         fi
-        
+
         # Count total executable lines in file (approximate)
         local file_total_lines
         file_total_lines=$(grep -c -v -E '^\s*#|^\s*$' "$file" 2>/dev/null || echo 0)
-        
+
         # For simplicity, assume 50% coverage for executed scripts
         local file_covered_lines=$((file_total_lines / 2))
-        
+
         local coverage_percent=50
         if [[ $file_total_lines -eq 0 ]]; then
             coverage_percent=0
         fi
-        
+
         # Color code based on coverage
         local color="$RED"
         if [[ $coverage_percent -ge 80 ]]; then
@@ -92,14 +92,14 @@ analyze_coverage() {
         elif [[ $coverage_percent -ge 60 ]]; then
             color="$YELLOW"
         fi
-        
+
         local filename
         filename=$(basename "$file")
-        
+
         printf "%-40s %s%3d/%-3d lines (%3d%%)%s\n" \
             "$filename" "$color" "$file_covered_lines" "$file_total_lines" "$coverage_percent" "$NC"
     done
-    
+
     echo ""
     echo "Summary"
     echo "======="
@@ -113,8 +113,8 @@ generate_html_report() {
         print_color "$RED" "No coverage data found."
         return 1
     fi
-    
-    cat > "$COVERAGE_REPORT_FILE" << 'EOF'
+
+    cat >"$COVERAGE_REPORT_FILE" <<'EOF'
 <!DOCTYPE html>
 <html>
 <head>
@@ -145,21 +145,21 @@ generate_html_report() {
         <h2>Executed Files</h2>
         <ul>
 EOF
-    
+
     # Add executed files to HTML
     if [[ -f "$COVERAGE_DATA_FILE" ]]; then
         cut -d: -f1 "$COVERAGE_DATA_FILE" | sort -u | while read -r file; do
-            echo "            <li class=\"partial\">$(basename "$file")</li>" >> "$COVERAGE_REPORT_FILE"
+            echo "            <li class=\"partial\">$(basename "$file")</li>" >>"$COVERAGE_REPORT_FILE"
         done
     fi
-    
-    cat >> "$COVERAGE_REPORT_FILE" << 'EOF'
+
+    cat >>"$COVERAGE_REPORT_FILE" <<'EOF'
         </ul>
     </div>
 </body>
 </html>
 EOF
-    
+
     print_color "$GREEN" "HTML coverage report generated: $COVERAGE_REPORT_FILE"
 }
 

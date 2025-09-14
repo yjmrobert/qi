@@ -1,6 +1,7 @@
 # qi - Git Repository Script Manager
 
-`qi` is a Linux command line tool that manages a cache of remote git repositories and allows you to quickly execute bash scripts from them by name.
+`qi` is a Linux command line tool that manages a cache of remote git repositories and allows you to
+quickly execute bash scripts from them by name.
 
 ## Table of Contents
 
@@ -18,7 +19,9 @@
 
 ## Overview
 
-`qi` simplifies the process of managing and executing bash scripts from multiple git repositories. Instead of manually cloning repositories and searching for scripts, `qi` maintains a local cache of repositories and provides fast script execution by name.
+`qi` simplifies the process of managing and executing bash scripts from multiple git repositories.
+Instead of manually cloning repositories and searching for scripts, `qi` maintains a local cache of
+repositories and provides fast script execution by name.
 
 ### Key Features
 
@@ -85,10 +88,12 @@ qi add <repository-url> [name]
 ```
 
 **Parameters:**
+
 - `<repository-url>`: The URL of the git repository (HTTPS or SSH)
 - `[name]`: Optional custom name for the repository. If not provided, uses the repository name
 
 **Examples:**
+
 ```bash
 # Add repository with default name
 qi add https://github.com/user/scripts.git
@@ -106,15 +111,18 @@ qi <script-name>
 ```
 
 **Parameters:**
+
 - `<script-name>`: The name of the `.bash` file to execute (without the `.bash` extension)
 
 **Behavior:**
+
 - Searches all cached repositories for files matching `<script-name>.bash`
 - If one match is found, executes the script immediately
 - If multiple matches are found, prompts you to select which repository's script to run
 - If no matches are found, displays an error message
 
 **Examples:**
+
 ```bash
 # Execute a script named 'deploy.bash'
 qi deploy
@@ -132,9 +140,11 @@ qi update [repository-name]
 ```
 
 **Parameters:**
+
 - `[repository-name]`: Optional. The name of a specific repository to update. If not provided, updates all cached repositories.
 
 **Behavior:**
+
 - If a repository name is specified, only that repository is updated
 - If no repository name is provided, all cached repositories are updated
 - Performs a `git pull` operation on the default branch of each repository
@@ -142,6 +152,7 @@ qi update [repository-name]
 - Maintains the current branch and any local modifications are preserved where possible
 
 **Examples:**
+
 ```bash
 # Update all cached repositories
 qi update
@@ -162,9 +173,11 @@ qi remove <name>
 ```
 
 **Parameters:**
+
 - `<name>`: The name of the repository to remove (either the custom name or default repository name)
 
 **Examples:**
+
 ```bash
 # Remove repository by name
 qi remove scripts
@@ -209,7 +222,7 @@ qi remove tools
 
 Your repositories should contain `.bash` files in any directory structure:
 
-```
+```text
 deployment-scripts/
 ├── server/
 │   ├── deploy.bash
@@ -226,6 +239,7 @@ All scripts (`deploy`, `rollback`, `backup`, `restore`, `health-check`) will be 
 ### Update Command Examples
 
 **Update all repositories:**
+
 ```bash
 qi update
 # Output:
@@ -235,6 +249,7 @@ qi update
 ```
 
 **Update specific repository:**
+
 ```bash
 qi update deploy
 # Output:
@@ -245,6 +260,7 @@ qi update deploy
 ```
 
 **Update with conflict resolution:**
+
 ```bash
 qi update tools
 # Output:
@@ -263,7 +279,8 @@ qi update tools
 ### Cache Location
 
 By default, `qi` stores cached repositories in:
-```
+
+```text
 ~/.qi/cache/
 ```
 
@@ -275,6 +292,7 @@ You can customize `qi` behavior with these environment variables:
 - `QI_DEFAULT_BRANCH`: Specify default branch to checkout (default: main/master)
 
 **Example:**
+
 ```bash
 export QI_CACHE_DIR="/opt/qi-cache"
 export QI_DEFAULT_BRANCH="develop"
@@ -296,6 +314,7 @@ verbose=false
 ### Common Issues
 
 **Repository clone fails:**
+
 ```bash
 # Check git credentials and network access
 git clone <repository-url>
@@ -305,6 +324,7 @@ ssh -T git@github.com
 ```
 
 **Script not found:**
+
 ```bash
 # List all available scripts
 qi list
@@ -317,6 +337,7 @@ qi update
 ```
 
 **Repository update fails:**
+
 ```bash
 # Check network connectivity
 ping github.com
@@ -331,6 +352,7 @@ qi update --force <repository-name>
 ```
 
 **Permission denied when executing script:**
+
 ```bash
 # Scripts should be executable
 chmod +x ~/.qi/cache/<repository-name>/path/to/script.bash
@@ -339,16 +361,19 @@ chmod +x ~/.qi/cache/<repository-name>/path/to/script.bash
 ### Debugging
 
 Enable verbose output:
+
 ```bash
 qi -v <command>
 ```
 
 Check cache status:
+
 ```bash
 qi status
 ```
 
 Update all cached repositories:
+
 ```bash
 qi update
 ```
@@ -356,21 +381,25 @@ qi update
 ### Cache Management
 
 **Clear entire cache:**
+
 ```bash
 rm -rf ~/.qi/cache/
 ```
 
 **Update specific repository:**
+
 ```bash
 qi update <repository-name>
 ```
 
 **Check update status:**
+
 ```bash
 qi update --dry-run
 ```
 
 **List cached repositories:**
+
 ```bash
 qi list-repos
 ```
@@ -380,6 +409,7 @@ qi list-repos
 ### Script Arguments
 
 Pass arguments to scripts:
+
 ```bash
 qi deploy --env production --force
 ```
@@ -387,6 +417,7 @@ qi deploy --env production --force
 ### Dry Run Mode
 
 Preview what script would be executed without running it:
+
 ```bash
 qi --dry-run deploy
 ```
@@ -394,6 +425,7 @@ qi --dry-run deploy
 ### Background Execution
 
 Run scripts in the background:
+
 ```bash
 qi --background long-running-task
 ```

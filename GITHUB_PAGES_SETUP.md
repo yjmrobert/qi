@@ -35,6 +35,7 @@ This document provides step-by-step instructions to enable GitHub Pages for the 
 ### 2. Trigger First Deployment
 
 Option A: **Push a documentation change**
+
 ```bash
 # Make any small change to trigger deployment
 echo "# Documentation updated $(date)" >> docs/index.md
@@ -44,6 +45,7 @@ git push origin main
 ```
 
 Option B: **Push the new documentation files**
+
 ```bash
 # If you haven't pushed the documentation files yet
 git add .
@@ -94,6 +96,7 @@ When someone opens a PR with documentation changes:
 Visit: `https://github.com/yjmrobert/qi/settings/pages`
 
 You should see:
+
 - Source: "GitHub Actions" ✅
 - A green checkmark with your site URL
 
@@ -102,6 +105,7 @@ You should see:
 Visit: `https://github.com/yjmrobert/qi/actions`
 
 You should see:
+
 - "Deploy Documentation" workflows
 - Green checkmarks for successful runs
 - Recent runs when you push documentation changes
@@ -111,6 +115,7 @@ You should see:
 Visit: `https://yjmrobert.github.io/qi/`
 
 You should see:
+
 - qi documentation homepage
 - Material theme with blue color scheme
 - Working navigation menu
@@ -133,11 +138,13 @@ repo_url: https://github.com/yourusername/repositoryname
 To use a custom domain (e.g., `docs.qi-tool.com`):
 
 1. **Add CNAME file** to `docs/` directory:
+
    ```bash
    echo "docs.qi-tool.com" > docs/CNAME
    ```
 
 2. **Update mkdocs.yml**:
+
    ```yaml
    site_url: https://docs.qi-tool.com/
    ```
@@ -159,19 +166,23 @@ To prevent accidental documentation breaks:
 ### Common Issues
 
 **"404 - Page not found" when visiting site:**
+
 - Check that GitHub Pages is enabled with "GitHub Actions" source
 - Wait 5-10 minutes after first deployment
 - Verify the URL: `https://yjmrobert.github.io/qi/`
 
 **Workflow fails with "Permission denied":**
+
 - Check repository Settings → Actions → General
 - Ensure "Read and write permissions" is selected for GITHUB_TOKEN
 
 **Build fails with "Config value 'nav' is invalid":**
+
 - Check `mkdocs.yml` syntax (YAML is sensitive to indentation)
 - Ensure all files referenced in navigation exist
 
 **Site loads but looks broken:**
+
 - Check browser console for errors
 - Verify all CSS/JS files are loading
 - Try hard refresh (Ctrl+F5)
@@ -179,17 +190,20 @@ To prevent accidental documentation breaks:
 ### Debug Steps
 
 1. **Check workflow logs:**
-   ```
+
+   ```text
    Actions tab → Latest workflow run → View logs
    ```
 
 2. **Test locally:**
+
    ```bash
    pip install -r requirements.txt
    mkdocs serve
    ```
 
 3. **Validate configuration:**
+
    ```bash
    mkdocs build --strict
    ```
@@ -222,7 +236,8 @@ git push
 ## Success Indicators
 
 ✅ **Setup Complete When:**
-- GitHub Pages shows "Your site is published at https://yjmrobert.github.io/qi/"
+
+- GitHub Pages shows "Your site is published at <https://yjmrobert.github.io/qi/>"
 - Documentation site loads without errors
 - Navigation works correctly
 - Search functionality works
@@ -230,6 +245,7 @@ git push
 - Mobile layout is responsive
 
 ✅ **Workflow Working When:**
+
 - Green checkmarks in Actions tab
 - Automatic deployments on documentation changes
 - PR comments with preview links
@@ -241,6 +257,7 @@ Once GitHub Pages is working:
 
 1. **Share the documentation URL** with users
 2. **Add link to README.md**:
+
    ```markdown
    ## Documentation
    
@@ -249,6 +266,7 @@ Once GitHub Pages is working:
 
 3. **Set up monitoring** for broken links
 4. **Consider adding** more advanced features:
+
    - Search analytics
    - User feedback system
    - Version switching
@@ -257,6 +275,7 @@ Once GitHub Pages is working:
 ---
 
 **Need Help?**
+
 - Check the [DOCS_SETUP.md](DOCS_SETUP.md) guide for detailed information
-- Review GitHub Pages documentation: https://docs.github.com/en/pages
+- Review GitHub Pages documentation: <https://docs.github.com/en/pages>
 - Open an issue if you encounter problems

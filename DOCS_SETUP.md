@@ -4,11 +4,13 @@ This guide explains how to set up and deploy the qi documentation using MkDocs a
 
 ## Overview
 
-The qi project uses [MkDocs](https://www.mkdocs.org/) with the [Material theme](https://squidfunk.github.io/mkdocs-material/) to generate beautiful, searchable documentation. The documentation is automatically deployed to GitHub Pages using GitHub Actions.
+The qi project uses [MkDocs](https://www.mkdocs.org/) with the
+[Material theme](https://squidfunk.github.io/mkdocs-material/) to generate beautiful, searchable documentation.
+The documentation is automatically deployed to GitHub Pages using GitHub Actions.
 
 ## Documentation Structure
 
-```
+```text
 qi/
 ├── docs/                          # Documentation source files
 │   ├── index.md                  # Homepage
@@ -41,22 +43,25 @@ qi/
 ### Setup
 
 1. **Create a virtual environment (recommended):**
+
    ```bash
    python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 2. **Install dependencies:**
+
    ```bash
    pip install -r requirements.txt
    ```
 
 3. **Serve documentation locally:**
+
    ```bash
    mkdocs serve
    ```
 
-4. **Open your browser to:** http://127.0.0.1:8000
+4. **Open your browser to:** <http://127.0.0.1:8000>
 
 ### Making Changes
 
@@ -156,6 +161,7 @@ nav:
 
 1. **Create markdown file** in `docs/` directory
 2. **Add to navigation** in `mkdocs.yml`:
+
    ```yaml
    nav:
      - New Page: new-page.md
@@ -171,6 +177,7 @@ nav:
 
 - **Override CSS** by creating `docs/stylesheets/extra.css`
 - **Add to mkdocs.yml**:
+
   ```yaml
   extra_css:
     - stylesheets/extra.css
@@ -179,11 +186,13 @@ nav:
 ### Adding Plugins
 
 1. **Add to requirements.txt:**
-   ```
+
+   ```text
    mkdocs-plugin-name>=1.0.0
    ```
 
 2. **Add to mkdocs.yml:**
+
    ```yaml
    plugins:
      - plugin-name
@@ -194,21 +203,25 @@ nav:
 ### Common Issues
 
 **Build fails with "Config value 'nav' is invalid":**
+
 - Check YAML syntax in `mkdocs.yml`
 - Ensure all referenced files exist
 - Use proper indentation (spaces, not tabs)
 
 **Missing pages or broken links:**
+
 - Run `mkdocs build --strict` to catch errors
 - Check file paths in navigation
 - Ensure markdown files exist
 
 **Styling issues:**
+
 - Clear browser cache
 - Check CSS syntax if using custom styles
 - Verify theme configuration
 
 **GitHub Actions fails:**
+
 - Check workflow logs in GitHub Actions tab
 - Verify requirements.txt is up to date
 - Ensure all referenced files exist
@@ -232,17 +245,20 @@ mkdocs build --site-dir custom-site
 ### Debugging
 
 **Enable verbose output:**
+
 ```bash
 mkdocs serve --verbose
 mkdocs build --verbose
 ```
 
 **Check configuration:**
+
 ```bash
 mkdocs config
 ```
 
 **Validate navigation:**
+
 ```bash
 python3 -c "import yaml; print(yaml.safe_load(open('mkdocs.yml'))['nav'])"
 ```
@@ -303,7 +319,7 @@ if __name__ == "__main__":
     ```
 
 === "Result"
-    ```
+    ```text
     Repository added successfully: repo
     ```
 
@@ -316,8 +332,8 @@ Press ++ctrl+c++ to cancel the operation.
 For documentation-related issues:
 
 1. **Check this guide** for common solutions
-2. **Review MkDocs documentation:** https://www.mkdocs.org/
-3. **Check Material theme docs:** https://squidfunk.github.io/mkdocs-material/
+2. **Review MkDocs documentation:** <https://www.mkdocs.org/>
+3. **Check Material theme docs:** <https://squidfunk.github.io/mkdocs-material/>
 4. **Open an issue** on the qi GitHub repository
 
 ---

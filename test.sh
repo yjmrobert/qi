@@ -52,28 +52,28 @@ test_warn() {
 # Setup test environment
 setup_test_env() {
     test_info "Setting up test environment"
-    
+
     # Use temporary cache directory for testing
     export QI_CACHE_DIR="$TEST_CACHE_DIR"
-    
+
     # Clean up any existing test cache
     if [[ -d "$TEST_CACHE_DIR" ]]; then
         rm -rf "$TEST_CACHE_DIR"
     fi
-    
+
     # Verify qi script exists
     if [[ ! -x "$QI_SCRIPT" ]]; then
         test_fail "qi script not found or not executable: $QI_SCRIPT"
         exit 1
     fi
-    
+
     test_pass "Test environment setup"
 }
 
 # Clean up test environment
 cleanup_test_env() {
     test_info "Cleaning up test environment"
-    
+
     if [[ -d "$TEST_CACHE_DIR" ]]; then
         rm -rf "$TEST_CACHE_DIR"
         test_pass "Test cache cleaned up"
@@ -83,21 +83,21 @@ cleanup_test_env() {
 # Test basic commands
 test_basic_commands() {
     test_info "Testing basic commands"
-    
+
     # Test help command
     if "$QI_SCRIPT" --help >/dev/null 2>&1; then
         test_pass "Help command works"
     else
         test_fail "Help command failed"
     fi
-    
+
     # Test version command
     if "$QI_SCRIPT" --version >/dev/null 2>&1; then
         test_pass "Version command works"
     else
         test_fail "Version command failed"
     fi
-    
+
     # Test config command
     if "$QI_SCRIPT" config >/dev/null 2>&1; then
         test_pass "Config command works"
@@ -109,28 +109,28 @@ test_basic_commands() {
 # Test repository management
 test_repository_management() {
     test_info "Testing repository management"
-    
+
     # Test adding repository
     if "$QI_SCRIPT" add https://github.com/octocat/Hello-World.git test-repo >/dev/null 2>&1; then
         test_pass "Repository add works"
     else
         test_fail "Repository add failed"
     fi
-    
+
     # Test listing repositories
     if "$QI_SCRIPT" list-repos | grep -q "test-repo"; then
         test_pass "Repository listing works"
     else
         test_fail "Repository listing failed"
     fi
-    
+
     # Test repository status
     if "$QI_SCRIPT" status >/dev/null 2>&1; then
         test_pass "Status command works"
     else
         test_fail "Status command failed"
     fi
-    
+
     # Test removing repository
     if echo "y" | "$QI_SCRIPT" remove test-repo >/dev/null 2>&1; then
         test_pass "Repository remove works"
@@ -142,27 +142,27 @@ test_repository_management() {
 # Test script discovery and execution
 test_script_functionality() {
     test_info "Testing script functionality"
-    
+
     # Add repository with scripts
     "$QI_SCRIPT" add https://github.com/octocat/Hello-World.git test-scripts >/dev/null 2>&1
-    
+
     # Create test script in qi directory
     local test_script_dir="$TEST_CACHE_DIR/test-scripts/qi"
     mkdir -p "$test_script_dir"
-    cat > "$test_script_dir/test.bash" << 'EOF'
+    cat >"$test_script_dir/test.bash" <<'EOF'
 #!/bin/bash
 echo "Test script executed successfully"
 echo "Arguments: $*"
 EOF
     chmod +x "$test_script_dir/test.bash"
-    
+
     # Test script listing
     if "$QI_SCRIPT" list | grep -q "test"; then
         test_pass "Script discovery works"
     else
         test_fail "Script discovery failed"
     fi
-    
+
     # Test script execution
     local output
     output=$("$QI_SCRIPT" test arg1 arg2 2>/dev/null)
@@ -171,14 +171,14 @@ EOF
     else
         test_fail "Script execution failed"
     fi
-    
+
     # Test dry-run mode
     if "$QI_SCRIPT" --dry-run test >/dev/null 2>&1; then
         test_pass "Dry-run mode works"
     else
         test_fail "Dry-run mode failed"
     fi
-    
+
     # Clean up
     echo "y" | "$QI_SCRIPT" remove test-scripts >/dev/null 2>&1
 }
@@ -186,21 +186,21 @@ EOF
 # Test error handling
 test_error_handling() {
     test_info "Testing error handling"
-    
+
     # Test invalid repository URL
     if ! "$QI_SCRIPT" add invalid-url 2>/dev/null; then
         test_pass "Invalid URL rejection works"
     else
         test_fail "Invalid URL rejection failed"
     fi
-    
+
     # Test non-existent repository removal
     if ! "$QI_SCRIPT" remove non-existent-repo 2>/dev/null; then
         test_pass "Non-existent repository rejection works"
     else
         test_fail "Non-existent repository rejection failed"
     fi
-    
+
     # Test non-existent script execution
     if ! "$QI_SCRIPT" non-existent-script 2>/dev/null; then
         test_pass "Non-existent script rejection works"
@@ -212,23 +212,23 @@ test_error_handling() {
 # Test install script functionality
 test_install_script() {
     test_info "Testing install script functionality"
-    
+
     local install_script="$SCRIPT_DIR/install.sh"
-    
+
     # Check if install script exists
     if [[ ! -f "$install_script" ]]; then
         test_fail "install.sh script not found"
         return
     fi
-    
+
     # Check if install script is executable
     if [[ ! -x "$install_script" ]]; then
         test_fail "install.sh script is not executable"
         return
     fi
-    
+
     test_pass "install.sh script exists and is executable"
-    
+
     # Test install script syntax
     if bash -n "$install_script" 2>/dev/null; then
         test_pass "install.sh script has valid bash syntax"
@@ -236,11 +236,11 @@ test_install_script() {
         test_fail "install.sh script has syntax errors"
         return
     fi
-    
+
     # Test install script functions (source and test individual functions)
     local temp_test_script="/tmp/test-install-functions.sh"
-    
-    cat > "$temp_test_script" << 'EOF'
+
+    cat >"$temp_test_script" <<'EOF'
 #!/bin/bash
 set -euo pipefail
 
@@ -311,43 +311,43 @@ main() {
 
 main "$@"
 EOF
-    
+
     chmod +x "$temp_test_script"
-    
+
     # Run function tests
     if "$temp_test_script" "$install_script" 2>/dev/null; then
         test_pass "install.sh script functions work correctly"
     else
         test_fail "install.sh script functions failed"
     fi
-    
+
     # Clean up
     rm -f "$temp_test_script"
-    
+
     # Test install script help/usage information
     if grep -q "Usage:" "$install_script" && grep -q "curl.*bash" "$install_script"; then
         test_pass "install.sh script contains usage information"
     else
         test_fail "install.sh script missing usage information"
     fi
-    
+
     # Test install script has proper error handling
     if grep -q "set -euo pipefail" "$install_script" && grep -q "trap.*handle_error" "$install_script"; then
         test_pass "install.sh script has proper error handling"
     else
         test_fail "install.sh script missing proper error handling"
     fi
-    
+
     # Test install script has all required functions
     local required_functions=("check_permissions" "check_requirements" "download_qi" "install_qi" "verify_installation")
     local missing_functions=()
-    
+
     for func in "${required_functions[@]}"; do
         if ! grep -q "^$func()" "$install_script"; then
             missing_functions+=("$func")
         fi
     done
-    
+
     if [[ ${#missing_functions[@]} -eq 0 ]]; then
         test_pass "install.sh script has all required functions"
     else
@@ -360,27 +360,27 @@ main() {
     print_color "$BLUE" "qi Test Suite"
     print_color "$BLUE" "============="
     echo ""
-    
+
     # Setup
     setup_test_env
-    
+
     # Run tests
     test_basic_commands
     test_repository_management
     test_script_functionality
     test_error_handling
     test_install_script
-    
+
     # Cleanup
     cleanup_test_env
-    
+
     # Results
     echo ""
     print_color "$BLUE" "Test Results"
     print_color "$BLUE" "============"
     echo "Total tests: $TESTS_TOTAL"
     print_color "$GREEN" "Passed: $TESTS_PASSED"
-    
+
     if [[ $TESTS_FAILED -gt 0 ]]; then
         print_color "$RED" "Failed: $TESTS_FAILED"
         echo ""

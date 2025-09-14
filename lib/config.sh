@@ -16,31 +16,31 @@ QI_CONFIG[max_cache_size]="${QI_MAX_CACHE_SIZE:-1G}"
 # Usage: load_config [config_file_path]
 load_config() {
     local config_file="${1:-${QI_CONFIG[config_file]}}"
-    
+
     if [[ ! -f "$config_file" ]]; then
         log "DEBUG" "Config file not found: $config_file"
         return 0
     fi
-    
+
     log "DEBUG" "Loading configuration from: $config_file"
-    
+
     # Read config file line by line
     while IFS='=' read -r key value || [[ -n "$key" ]]; do
         # Skip empty lines and comments
         [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
-        
+
         # Remove leading/trailing whitespace
         key=$(echo "$key" | xargs)
         value=$(echo "$value" | xargs)
-        
+
         # Remove quotes from value if present
         if [[ "$value" =~ ^\".*\"$ ]] || [[ "$value" =~ ^\'.*\'$ ]]; then
             value="${value:1:-1}"
         fi
-        
+
         # Set configuration value
         case "$key" in
-            cache_dir|config_file|default_branch|auto_update|verbose|max_cache_size)
+            cache_dir | config_file | default_branch | auto_update | verbose | max_cache_size)
                 QI_CONFIG[$key]="$value"
                 log "DEBUG" "Config loaded: $key=$value"
                 ;;
@@ -48,7 +48,7 @@ load_config() {
                 log "WARN" "Unknown configuration key: $key"
                 ;;
         esac
-    done < "$config_file"
+    done <"$config_file"
 }
 
 # Save configuration to file
@@ -56,17 +56,17 @@ save_config() {
     local config_file="${1:-${QI_CONFIG[config_file]}}"
     local config_dir
     config_dir="$(dirname "$config_file")"
-    
+
     # Create config directory if it doesn't exist
     if [[ ! -d "$config_dir" ]]; then
         log "INFO" "Creating config directory: $config_dir"
         mkdir -p "$config_dir"
     fi
-    
+
     log "INFO" "Saving configuration to: $config_file"
-    
+
     # Write configuration file
-    cat > "$config_file" << EOF
+    cat >"$config_file" <<EOF
 # qi configuration file
 # Generated on $(date)
 
@@ -85,7 +85,7 @@ verbose=${QI_CONFIG[verbose]}
 # Maximum cache size (e.g., 1G, 500M)
 max_cache_size=${QI_CONFIG[max_cache_size]}
 EOF
-    
+
     log "INFO" "Configuration saved successfully"
 }
 
@@ -93,7 +93,7 @@ EOF
 get_config() {
     local key="$1"
     local default_value="${2:-}"
-    
+
     if [[ -n "${QI_CONFIG[$key]:-}" ]]; then
         echo "${QI_CONFIG[$key]}"
     else
@@ -106,10 +106,10 @@ set_config() {
     local key="$1"
     local value="$2"
     local save="${3:-false}"
-    
+
     QI_CONFIG[$key]="$value"
     log "DEBUG" "Config set: $key=$value"
-    
+
     if [[ "$save" == "true" ]]; then
         save_config
     fi
@@ -118,7 +118,7 @@ set_config() {
 # Validate configuration
 validate_config() {
     local errors=0
-    
+
     # Validate cache directory
     local cache_dir="${QI_CONFIG[cache_dir]}"
     if [[ -n "$cache_dir" ]]; then
@@ -139,14 +139,14 @@ validate_config() {
         log "ERROR" "Cache directory not configured"
         ((errors++))
     fi
-    
+
     # Validate default branch
     local default_branch="${QI_CONFIG[default_branch]}"
     if [[ -z "$default_branch" ]]; then
         log "WARN" "Default branch not configured, using 'main'"
         QI_CONFIG[default_branch]="main"
     fi
-    
+
     # Validate boolean values
     for key in auto_update verbose; do
         local value="${QI_CONFIG[$key]}"
@@ -155,46 +155,46 @@ validate_config() {
             QI_CONFIG[$key]="false"
         fi
     done
-    
+
     # Validate cache size
     local max_cache_size="${QI_CONFIG[max_cache_size]}"
     if [[ -n "$max_cache_size" && ! "$max_cache_size" =~ ^[0-9]+[KMGT]?$ ]]; then
         log "WARN" "Invalid cache size format: $max_cache_size, using '1G'"
         QI_CONFIG[max_cache_size]="1G"
     fi
-    
+
     return $errors
 }
 
 # Initialize configuration system
 init_config() {
     log "DEBUG" "Initializing configuration system"
-    
+
     # Load configuration from file if it exists
     load_config "$@"
-    
+
     # Override with environment variables if set
     [[ -n "${QI_CACHE_DIR:-}" ]] && QI_CONFIG[cache_dir]="$QI_CACHE_DIR"
     [[ -n "${QI_DEFAULT_BRANCH:-}" ]] && QI_CONFIG[default_branch]="$QI_DEFAULT_BRANCH"
     [[ -n "${QI_AUTO_UPDATE:-}" ]] && QI_CONFIG[auto_update]="$QI_AUTO_UPDATE"
     [[ -n "${QI_VERBOSE:-}" ]] && QI_CONFIG[verbose]="$QI_VERBOSE"
     [[ -n "${QI_MAX_CACHE_SIZE:-}" ]] && QI_CONFIG[max_cache_size]="$QI_MAX_CACHE_SIZE"
-    
+
     # Apply verbose setting to global variable
     if [[ "${QI_CONFIG[verbose]}" == "true" ]]; then
-        export VERBOSE=true  # Global variable used throughout the application
+        export VERBOSE=true # Global variable used throughout the application
     fi
-    
+
     # Validate configuration
     if ! validate_config; then
         log "ERROR" "Configuration validation failed"
         return 1
     fi
-    
+
     # Update global variables
     CACHE_DIR="${QI_CONFIG[cache_dir]}"
     CONFIG_FILE="${QI_CONFIG[config_file]}"
-    
+
     log "DEBUG" "Configuration initialized successfully"
     log "DEBUG" "Cache directory: $CACHE_DIR"
     log "DEBUG" "Config file: $CONFIG_FILE"
@@ -212,7 +212,7 @@ show_config() {
     echo "Verbose:            ${QI_CONFIG[verbose]}"
     echo "Max cache size:     ${QI_CONFIG[max_cache_size]}"
     echo ""
-    
+
     # Show environment variable overrides
     echo "Environment Variables:"
     echo "====================="
@@ -226,12 +226,12 @@ show_config() {
 # Create default configuration file
 create_default_config() {
     local config_file="${1:-${QI_CONFIG[config_file]}}"
-    
+
     if [[ -f "$config_file" ]]; then
         log "INFO" "Configuration file already exists: $config_file"
         return 0
     fi
-    
+
     log "INFO" "Creating default configuration file: $config_file"
     save_config "$config_file"
 }
@@ -241,12 +241,12 @@ size_to_bytes() {
     local size="$1"
     local number="${size%[KMGT]}"
     local unit="${size: -1}"
-    
+
     case "$unit" in
-        K|k) echo $((number * 1024)) ;;
-        M|m) echo $((number * 1024 * 1024)) ;;
-        G|g) echo $((number * 1024 * 1024 * 1024)) ;;
-        T|t) echo $((number * 1024 * 1024 * 1024 * 1024)) ;;
+        K | k) echo $((number * 1024)) ;;
+        M | m) echo $((number * 1024 * 1024)) ;;
+        G | g) echo $((number * 1024 * 1024 * 1024)) ;;
+        T | t) echo $((number * 1024 * 1024 * 1024 * 1024)) ;;
         *) echo "$number" ;;
     esac
 }

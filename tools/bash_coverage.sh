@@ -26,7 +26,7 @@ print_color() {
 # Initialize coverage tracking
 init_coverage() {
     mkdir -p "$COVERAGE_DIR"
-    true > "$COVERAGE_DATA_FILE"
+    true >"$COVERAGE_DATA_FILE"
     print_color "$BLUE" "Coverage tracking initialized in $COVERAGE_DIR"
 }
 
@@ -34,14 +34,14 @@ init_coverage() {
 instrument_script() {
     local input_file="$1"
     local output_file="$2"
-    
+
     if [[ ! -f "$input_file" ]]; then
         echo "Error: Input file $input_file not found" >&2
         return 1
     fi
-    
+
     print_color "$BLUE" "Instrumenting $input_file -> $output_file"
-    
+
     # Create instrumented version with line tracking
     {
         echo "#!/bin/bash"
@@ -54,7 +54,7 @@ instrument_script() {
         echo "    echo \"\$ORIGINAL_FILE:\$1\" >> \"\$COVERAGE_DATA_FILE\""
         echo "}"
         echo ""
-        
+
         # Process each line of the original script
         local line_num=1
         local in_function=0
@@ -70,11 +70,11 @@ instrument_script() {
             elif [[ "$line" =~ ^[[:space:]]*esac[[:space:]]*$ ]] && [[ $in_case -gt 0 ]]; then
                 ((in_case--))
             fi
-            
+
             # Skip shebang line
             if [[ $line_num -eq 1 && "$line" =~ ^#! ]]; then
                 echo "# Original shebang: $line"
-            elif [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "${line// }" ]]; then
+            elif [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "${line// /}" ]]; then
                 # Skip comments and empty lines
                 echo "$line"
             elif [[ "$line" =~ ^[[:space:]]*$ ]]; then
@@ -83,17 +83,17 @@ instrument_script() {
             else
                 # Add line tracking before executable lines
                 # Simplified approach: only track top-level executable statements
-                if [[ "$line" =~ ^[[:space:]]*# ]] || \
-                   [[ "$line" =~ ^[[:space:]]*$ ]] || \
-                   [[ "$line" =~ ^[[:space:]]*\{ ]] || \
-                   [[ "$line" =~ ^[[:space:]]*\} ]] || \
-                   [[ "$line" =~ ^[[:space:]]*fi[[:space:]]*$ ]] || \
-                   [[ "$line" =~ ^[[:space:]]*done[[:space:]]*$ ]] || \
-                   [[ "$line" =~ ^[[:space:]]*esac[[:space:]]*$ ]] || \
-                   [[ "$line" =~ \(\)[[:space:]]*$ ]] || \
-                   [[ "$line" =~ case.*in[[:space:]]*$ ]] || \
-                   [[ "$line" =~ \)[[:space:]]*$ ]] || \
-                   [[ $in_function -gt 0 ]] || [[ $in_case -gt 0 ]]; then
+                if [[ "$line" =~ ^[[:space:]]*# ]] ||
+                    [[ "$line" =~ ^[[:space:]]*$ ]] ||
+                    [[ "$line" =~ ^[[:space:]]*\{ ]] ||
+                    [[ "$line" =~ ^[[:space:]]*\} ]] ||
+                    [[ "$line" =~ ^[[:space:]]*fi[[:space:]]*$ ]] ||
+                    [[ "$line" =~ ^[[:space:]]*done[[:space:]]*$ ]] ||
+                    [[ "$line" =~ ^[[:space:]]*esac[[:space:]]*$ ]] ||
+                    [[ "$line" =~ \(\)[[:space:]]*$ ]] ||
+                    [[ "$line" =~ case.*in[[:space:]]*$ ]] ||
+                    [[ "$line" =~ \)[[:space:]]*$ ]] ||
+                    [[ $in_function -gt 0 ]] || [[ $in_case -gt 0 ]]; then
                     # Don't track structural elements or function/case content
                     echo "$line"
                 else
@@ -103,9 +103,9 @@ instrument_script() {
                 fi
             fi
             ((line_num++))
-        done < "$input_file"
-    } > "$output_file"
-    
+        done <"$input_file"
+    } >"$output_file"
+
     chmod +x "$output_file"
 }
 
@@ -114,24 +114,24 @@ run_with_coverage() {
     local script="$1"
     shift
     local args=("$@")
-    
+
     local temp_dir
     temp_dir=$(mktemp -d -t coverage.XXXXXX)
     local instrumented_script
     instrumented_script="$temp_dir/$(basename "$script")"
-    
+
     # Instrument the script
     instrument_script "$script" "$instrumented_script"
-    
+
     print_color "$BLUE" "Running $script with coverage tracking..."
-    
+
     # Run the instrumented script
     local exit_code=0
     bash "$instrumented_script" "${args[@]}" || exit_code=$?
-    
+
     # Clean up
     rm -rf "$temp_dir"
-    
+
     return $exit_code
 }
 
@@ -141,39 +141,39 @@ analyze_coverage() {
         print_color "$RED" "No coverage data found. Run tests first."
         return 1
     fi
-    
+
     print_color "$BLUE" "Analyzing coverage data..."
-    
+
     # Get unique files covered
     local files
     mapfile -t files < <(cut -d: -f1 "$COVERAGE_DATA_FILE" | sort -u)
-    
+
     local total_files=${#files[@]}
     local total_lines=0
     local covered_lines=0
-    
+
     echo "Coverage Report"
     echo "=============="
     echo ""
-    
+
     for file in "${files[@]}"; do
         if [[ ! -f "$file" ]]; then
             continue
         fi
-        
+
         # Count total executable lines in file
         local file_total_lines
         file_total_lines=$(grep -c -v -E '^\s*#|^\s*$' "$file")
-        
+
         # Count covered lines for this file
         local file_covered_lines
         file_covered_lines=$(grep "^$file:" "$COVERAGE_DATA_FILE" | cut -d: -f2 | sort -u | wc -l)
-        
+
         local coverage_percent=0
         if [[ $file_total_lines -gt 0 ]]; then
             coverage_percent=$((file_covered_lines * 100 / file_total_lines))
         fi
-        
+
         # Color code based on coverage
         local color="$RED"
         if [[ $coverage_percent -ge 80 ]]; then
@@ -181,32 +181,32 @@ analyze_coverage() {
         elif [[ $coverage_percent -ge 60 ]]; then
             color="$YELLOW"
         fi
-        
+
         print_color "$color" "$(printf "%-40s %3d/%3d lines (%3d%%)" "$(basename "$file")" "$file_covered_lines" "$file_total_lines" "$coverage_percent")"
-        
+
         total_lines=$((total_lines + file_total_lines))
         covered_lines=$((covered_lines + file_covered_lines))
     done
-    
+
     echo ""
     echo "Summary"
     echo "======="
-    
+
     local overall_percent=0
     if [[ $total_lines -gt 0 ]]; then
         overall_percent=$((covered_lines * 100 / total_lines))
     fi
-    
+
     local summary_color="$RED"
     if [[ $overall_percent -ge 80 ]]; then
         summary_color="$GREEN"
     elif [[ $overall_percent -ge 60 ]]; then
         summary_color="$YELLOW"
     fi
-    
+
     print_color "$summary_color" "Overall Coverage: $covered_lines/$total_lines lines ($overall_percent%)"
     print_color "$BLUE" "Files analyzed: $total_files"
-    
+
     # Return non-zero if coverage is below 80%
     if [[ $overall_percent -lt 80 ]]; then
         print_color "$YELLOW" "Warning: Coverage is below 80% threshold"
@@ -223,10 +223,10 @@ generate_html_report() {
         print_color "$RED" "No coverage data found. Run tests first."
         return 1
     fi
-    
+
     print_color "$BLUE" "Generating HTML coverage report..."
-    
-    cat > "$COVERAGE_REPORT_FILE" << 'EOF'
+
+    cat >"$COVERAGE_REPORT_FILE" <<'EOF'
 <!DOCTYPE html>
 <html>
 <head>
@@ -251,48 +251,48 @@ generate_html_report() {
         <p>Generated on: $(date)</p>
     </div>
 EOF
-    
+
     # Add file coverage table
     {
         echo '<h2>File Coverage Summary</h2>'
         echo '<table>'
         echo '<tr><th>File</th><th>Lines Covered</th><th>Total Lines</th><th>Coverage %</th></tr>'
-    } >> "$COVERAGE_REPORT_FILE"
-    
+    } >>"$COVERAGE_REPORT_FILE"
+
     local files
     mapfile -t files < <(cut -d: -f1 "$COVERAGE_DATA_FILE" | sort -u)
-    
+
     for file in "${files[@]}"; do
         if [[ ! -f "$file" ]]; then
             continue
         fi
-        
+
         local file_total_lines
         file_total_lines=$(grep -c -v -E '^\s*#|^\s*$' "$file")
-        
+
         local file_covered_lines
         file_covered_lines=$(grep "^$file:" "$COVERAGE_DATA_FILE" | cut -d: -f2 | sort -u | wc -l)
-        
+
         local coverage_percent=0
         if [[ $file_total_lines -gt 0 ]]; then
             coverage_percent=$((file_covered_lines * 100 / file_total_lines))
         fi
-        
+
         local row_class="uncovered"
         if [[ $coverage_percent -ge 80 ]]; then
             row_class="covered"
         elif [[ $coverage_percent -ge 60 ]]; then
             row_class="partial"
         fi
-        
-        echo "<tr class=\"$row_class\"><td>$(basename "$file")</td><td>$file_covered_lines</td><td>$file_total_lines</td><td>$coverage_percent%</td></tr>" >> "$COVERAGE_REPORT_FILE"
+
+        echo "<tr class=\"$row_class\"><td>$(basename "$file")</td><td>$file_covered_lines</td><td>$file_total_lines</td><td>$coverage_percent%</td></tr>" >>"$COVERAGE_REPORT_FILE"
     done
-    
+
     {
         echo '</table>'
         echo '</body></html>'
-    } >> "$COVERAGE_REPORT_FILE"
-    
+    } >>"$COVERAGE_REPORT_FILE"
+
     print_color "$GREEN" "HTML report generated: $COVERAGE_REPORT_FILE"
 }
 
@@ -306,7 +306,7 @@ clean_coverage() {
 
 # Show usage
 show_usage() {
-    cat << EOF
+    cat <<EOF
 Usage: $0 <command> [options]
 
 Commands:
@@ -333,10 +333,10 @@ main() {
         show_usage
         exit 1
     fi
-    
+
     local command="$1"
     shift
-    
+
     case "$command" in
         "init")
             init_coverage
@@ -357,7 +357,7 @@ main() {
         "clean")
             clean_coverage
             ;;
-        "help"|"-h"|"--help")
+        "help" | "-h" | "--help")
             show_usage
             ;;
         *)

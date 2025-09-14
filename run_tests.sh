@@ -74,30 +74,30 @@ print_info() {
 # Check prerequisites
 check_prerequisites() {
     print_section "Checking Prerequisites"
-    
+
     local missing_deps=()
-    
+
     # Check for shunit2
     if [[ ! -f "$SHUNIT2" ]]; then
         missing_deps+=("shunit2 (expected at $SHUNIT2)")
     else
         print_success "shunit2 found"
     fi
-    
+
     # Check for coverage tool
     if [[ "$ENABLE_COVERAGE" == "true" && ! -f "$COVERAGE_TOOL" && ! -f "$SIMPLE_COVERAGE_TOOL" ]]; then
         missing_deps+=("coverage tool (expected at $COVERAGE_TOOL or $SIMPLE_COVERAGE_TOOL)")
     elif [[ "$ENABLE_COVERAGE" == "true" ]]; then
         print_success "Coverage tool found"
     fi
-    
+
     # Check for test directory
     if [[ ! -d "$TESTS_DIR" ]]; then
         missing_deps+=("tests directory (expected at $TESTS_DIR)")
     else
         print_success "Tests directory found"
     fi
-    
+
     # Check for required commands
     local required_commands=("bash" "find" "grep" "sort" "wc")
     for cmd in "${required_commands[@]}"; do
@@ -105,7 +105,7 @@ check_prerequisites() {
             missing_deps+=("$cmd command")
         fi
     done
-    
+
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
         print_error "Missing prerequisites:"
         for dep in "${missing_deps[@]}"; do
@@ -113,7 +113,7 @@ check_prerequisites() {
         done
         return 1
     fi
-    
+
     print_success "All prerequisites satisfied"
     return 0
 }
@@ -121,24 +121,24 @@ check_prerequisites() {
 # Find all test files
 find_test_files() {
     local test_files=()
-    
+
     if [[ -n "$FILTER" ]]; then
         print_info "Filtering tests with pattern: $FILTER" >&2
         mapfile -t test_files < <(find "$TESTS_DIR" -name "test_*.sh" -executable | grep "$FILTER" | sort)
     else
         mapfile -t test_files < <(find "$TESTS_DIR" -name "test_*.sh" -executable | sort)
     fi
-    
+
     if [[ ${#test_files[@]} -eq 0 ]]; then
         print_error "No test files found in $TESTS_DIR" >&2
         return 1
     fi
-    
+
     print_info "Found ${#test_files[@]} test files:" >&2
     for test_file in "${test_files[@]}"; do
         print_info "  - $(basename "$test_file")" >&2
     done
-    
+
     printf '%s\n' "${test_files[@]}"
 }
 
@@ -147,15 +147,15 @@ run_test_file() {
     local test_file="$1"
     local test_name
     test_name="$(basename "$test_file" .sh)"
-    
+
     print_section "Running $test_name"
-    
+
     local start_time
     start_time=$(date +%s)
-    
+
     local output_file="$COVERAGE_DIR/${test_name}.out"
     local error_file="$COVERAGE_DIR/${test_name}.err"
-    
+
     # Run test with or without coverage
     local exit_code=0
     if [[ "$ENABLE_COVERAGE" == "true" ]]; then
@@ -168,9 +168,9 @@ run_test_file() {
             exit_code=${PIPESTATUS[0]}
         else
             if [[ "$(basename "$COVERAGE_TOOL")" == "bash_coverage_simple.sh" ]]; then
-                "$COVERAGE_TOOL" run "$test_file" > "$output_file" 2> "$error_file"
+                "$COVERAGE_TOOL" run "$test_file" >"$output_file" 2>"$error_file"
             else
-                bash "$COVERAGE_TOOL" run_with_coverage "$test_file" > "$output_file" 2> "$error_file"
+                bash "$COVERAGE_TOOL" run_with_coverage "$test_file" >"$output_file" 2>"$error_file"
             fi
             exit_code=$?
         fi
@@ -179,15 +179,15 @@ run_test_file() {
             bash "$test_file" 2>&1 | tee "$output_file"
             exit_code=${PIPESTATUS[0]}
         else
-            bash "$test_file" > "$output_file" 2> "$error_file"
+            bash "$test_file" >"$output_file" 2>"$error_file"
             exit_code=$?
         fi
     fi
-    
+
     local end_time
     end_time=$(date +%s)
     local duration=$((end_time - start_time))
-    
+
     # Parse shunit2 output for statistics
     local test_output
     if [[ -f "$output_file" ]]; then
@@ -195,61 +195,61 @@ run_test_file() {
     else
         test_output=""
     fi
-    
+
     # Extract test results from shunit2 output
     local ran_tests=0
     local failures=0
     local errors=0
     local skipped=0
-    
+
     if [[ "$test_output" =~ Ran\ ([0-9]+)\ test ]]; then
         ran_tests="${BASH_REMATCH[1]}"
     fi
-    
+
     if [[ "$test_output" =~ FAILED.*failures=([0-9]+) ]]; then
         failures="${BASH_REMATCH[1]}"
     fi
-    
+
     if [[ "$test_output" =~ errors=([0-9]+) ]]; then
         errors="${BASH_REMATCH[1]}"
     fi
-    
+
     if [[ "$test_output" =~ skipped=([0-9]+) ]]; then
         skipped="${BASH_REMATCH[1]}"
     fi
-    
+
     # Update global statistics
     TOTAL_TESTS=$((TOTAL_TESTS + ran_tests))
     FAILED_TESTS=$((FAILED_TESTS + failures + errors))
     SKIPPED_TESTS=$((SKIPPED_TESTS + skipped))
     PASSED_TESTS=$((PASSED_TESTS + ran_tests - failures - errors - skipped))
-    
+
     # Report results
     if [[ $exit_code -eq 0 && $failures -eq 0 && $errors -eq 0 ]]; then
         print_success "$test_name completed successfully ($ran_tests tests, ${duration}s)"
     else
         print_error "$test_name failed ($failures failures, $errors errors, ${duration}s)"
-        
+
         # Show error output if not verbose
         if [[ "$VERBOSE" != "true" && -f "$error_file" && -s "$error_file" ]]; then
             print_error "Error output:"
             sed 's/^/  /' "$error_file"
         fi
-        
+
         # Show failed test details
         if [[ "$VERBOSE" != "true" && -f "$output_file" ]]; then
             print_error "Test output:"
             grep -E "FAIL|ERROR|ASSERT" "$output_file" | sed 's/^/  /' || true
         fi
     fi
-    
+
     return "$exit_code"
 }
 
 # Run all tests
 run_all_tests() {
     print_header "Running All Tests"
-    
+
     # Initialize coverage if enabled
     if [[ "$ENABLE_COVERAGE" == "true" ]]; then
         print_section "Initializing Coverage"
@@ -266,30 +266,30 @@ run_all_tests() {
             COVERAGE_TOOL="$SIMPLE_COVERAGE_TOOL"
         fi
     fi
-    
+
     # Create output directory
     mkdir -p "$COVERAGE_DIR"
-    
+
     # Find test files
     local test_files
     mapfile -t test_files < <(find_test_files)
-    
+
     if [[ ${#test_files[@]} -eq 0 ]]; then
         return 1
     fi
-    
+
     # Run tests
     local failed_files=()
-    
+
     if [[ "$PARALLEL" == "true" && ${#test_files[@]} -gt 1 ]]; then
         print_info "Running tests in parallel..."
         local pids=()
-        
+
         for test_file in "${test_files[@]}"; do
             run_test_file "$test_file" &
             pids+=($!)
         done
-        
+
         # Wait for all tests to complete
         for pid in "${pids[@]}"; do
             if ! wait "$pid"; then
@@ -303,24 +303,24 @@ run_all_tests() {
             fi
         done
     fi
-    
+
     # Report overall results
     print_section "Test Results Summary"
-    
+
     print_info "Total tests run: $TOTAL_TESTS"
-    
+
     if [[ $PASSED_TESTS -gt 0 ]]; then
         print_success "Passed: $PASSED_TESTS"
     fi
-    
+
     if [[ $FAILED_TESTS -gt 0 ]]; then
         print_error "Failed: $FAILED_TESTS"
     fi
-    
+
     if [[ $SKIPPED_TESTS -gt 0 ]]; then
         print_warning "Skipped: $SKIPPED_TESTS"
     fi
-    
+
     if [[ ${#failed_files[@]} -gt 0 ]]; then
         print_error "Failed test files:"
         for file in "${failed_files[@]}"; do
@@ -328,7 +328,7 @@ run_all_tests() {
         done
         return 1
     fi
-    
+
     print_success "All tests passed!"
     return 0
 }
@@ -339,9 +339,9 @@ generate_coverage_report() {
         print_info "Coverage reporting disabled"
         return 0
     fi
-    
+
     print_header "Coverage Report"
-    
+
     # Generate coverage analysis
     local coverage_exit_code=0
     if [[ "$(basename "$COVERAGE_TOOL")" == "bash_coverage_simple.sh" ]]; then
@@ -351,14 +351,14 @@ generate_coverage_report() {
         bash "$COVERAGE_TOOL" analyze_coverage || coverage_exit_code=$?
         bash "$COVERAGE_TOOL" generate_html_report
     fi
-    
+
     print_info "Coverage reports generated in $COVERAGE_DIR/"
-    
+
     if [[ $coverage_exit_code -ne 0 ]]; then
         print_warning "Coverage is below $COVERAGE_THRESHOLD% threshold"
         return 1
     fi
-    
+
     return 0
 }
 
@@ -374,7 +374,7 @@ cleanup() {
 
 # Show usage information
 show_usage() {
-    cat << EOF
+    cat <<EOF
 Usage: $0 [options] [command]
 
 Commands:
@@ -411,7 +411,7 @@ EOF
 # Main function
 main() {
     local command="run"
-    
+
     # Parse command line arguments
     while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -423,11 +423,11 @@ main() {
                 COVERAGE_THRESHOLD="$2"
                 shift 2
                 ;;
-            --verbose|-v)
+            --verbose | -v)
                 VERBOSE="true"
                 shift
                 ;;
-            --parallel|-p)
+            --parallel | -p)
                 PARALLEL="true"
                 shift
                 ;;
@@ -435,11 +435,11 @@ main() {
                 FILTER="$2"
                 shift 2
                 ;;
-            --help|-h)
+            --help | -h)
                 show_usage
                 exit 0
                 ;;
-            run|coverage|clean|list)
+            run | coverage | clean | list)
                 command="$1"
                 shift
                 ;;
@@ -450,24 +450,24 @@ main() {
                 ;;
         esac
     done
-    
+
     # Set environment variables
     export COVERAGE_DIR
     export COVERAGE_THRESHOLD
-    
+
     # Execute command
     case "$command" in
         "run")
             if ! check_prerequisites; then
                 exit 1
             fi
-            
+
             local test_exit_code=0
             run_all_tests || test_exit_code=$?
-            
+
             local coverage_exit_code=0
             generate_coverage_report || coverage_exit_code=$?
-            
+
             if [[ $test_exit_code -ne 0 ]]; then
                 print_error "Some tests failed"
                 exit 1

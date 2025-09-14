@@ -74,7 +74,7 @@ test_normalize_git_url() {
     local result
     result=$(normalize_git_url "https://github.com/user/repo")
     assertEquals "Should add .git suffix" "https://github.com/user/repo.git" "$result"
-    
+
     result=$(normalize_git_url "https://github.com/user/repo.git")
     assertEquals "Should keep existing .git suffix" "https://github.com/user/repo.git" "$result"
 }
@@ -102,13 +102,13 @@ test_sanitize_repo_name() {
     local result
     result=$(sanitize_repo_name "my repo")
     assertEquals "Should replace spaces with underscores" "my_repo" "$result"
-    
+
     result=$(sanitize_repo_name "my@repo#test")
     assertEquals "Should replace special chars with underscores" "my_repo_test" "$result"
-    
+
     result=$(sanitize_repo_name "...test...")
     assertEquals "Should trim leading/trailing dots" "test" "$result"
-    
+
     result=$(sanitize_repo_name "")
     assertEquals "Should provide default for empty name" "repo" "$result"
 }
@@ -131,13 +131,13 @@ test_format_size() {
     local result
     result=$(format_size 512)
     assertEquals "Should format bytes" "512B" "$result"
-    
+
     result=$(format_size 1536)
     assertEquals "Should format kilobytes" "1K" "$result"
-    
+
     result=$(format_size 1048576)
     assertEquals "Should format megabytes" "1M" "$result"
-    
+
     result=$(format_size 1073741824)
     assertEquals "Should format gigabytes" "1G" "$result"
 }
@@ -147,14 +147,14 @@ test_get_dir_size() {
     # Create test directory with known content
     local test_dir="$TEST_TEMP_DIR/size_test"
     mkdir -p "$test_dir"
-    echo "test content" > "$test_dir/file1.txt"
-    echo "more content" > "$test_dir/file2.txt"
-    
+    echo "test content" >"$test_dir/file1.txt"
+    echo "more content" >"$test_dir/file2.txt"
+
     local size
     size=$(get_dir_size "$test_dir")
     assertTrue "Should return numeric size for existing directory" "[[ '$size' =~ ^[0-9]+$ ]]"
     assertTrue "Should return non-zero size for directory with files" "[[ '$size' -gt 0 ]]"
-    
+
     size=$(get_dir_size "/nonexistent/directory")
     assertEquals "Should return 0 for non-existent directory" "0" "$size"
 }
@@ -163,11 +163,11 @@ test_get_dir_size() {
 test_create_temp_dir() {
     local temp_dir
     temp_dir=$(create_temp_dir "test_prefix")
-    
+
     assertTrue "Should create directory" "[[ -d '$temp_dir' ]]"
     assertTrue "Should be writable" "[[ -w '$temp_dir' ]]"
     assertTrue "Should contain prefix in name" "[[ '$temp_dir' =~ test_prefix ]]"
-    
+
     # Clean up
     rm -rf "$temp_dir"
 }
@@ -177,7 +177,7 @@ test_cleanup_temp_dir() {
     local temp_dir
     temp_dir=$(create_temp_dir "cleanup_test")
     assertTrue "Directory should exist before cleanup" "[[ -d '$temp_dir' ]]"
-    
+
     cleanup_temp_dir "$temp_dir"
     assertFalse "Directory should not exist after cleanup" "[[ -d '$temp_dir' ]]"
 }
@@ -193,10 +193,10 @@ test_time_diff() {
     local result
     result=$(time_diff 100 160)
     assertEquals "Should format minute difference" "1m 0s" "$result"
-    
+
     result=$(time_diff 100 130)
     assertEquals "Should format second difference" "30s" "$result"
-    
+
     result=$(time_diff 100 3800)
     assertEquals "Should format hour difference" "1h 1m" "$result"
 }
@@ -206,7 +206,7 @@ test_escape_regex() {
     local result
     result=$(escape_regex "test.string")
     assertEquals "test\.string" "$result"
-    
+
     result=$(escape_regex "test[bracket]")
     assertEquals "test\\[bracket\\]" "$result"
 }
@@ -215,24 +215,24 @@ test_join_array() {
     local result
     result=$(join_array "," "one" "two" "three")
     assertEquals "Should join with comma" "one,two,three" "$result"
-    
+
     result=$(join_array "|" "single")
     assertEquals "Should handle single element" "single" "$result"
-    
-    result=$(join_array ":" )
+
+    result=$(join_array ":")
     assertEquals "Should handle empty array" "" "$result"
 }
 
 # Tests for array operations
 test_array_contains() {
     local test_array=("apple" "banana" "cherry")
-    
+
     if array_contains 'banana' "${test_array[@]}"; then
         assertTrue "Found existing element" true
     else
         assertTrue "Should find existing element" false
     fi
-    
+
     if array_contains 'grape' "${test_array[@]}"; then
         assertFalse "Should not find non-existent element" true
     else
@@ -244,10 +244,10 @@ test_array_contains() {
 test_retry_command() {
     # Test successful command
     assertTrue "Should succeed on first try" "retry_command 3 1 true"
-    
+
     # Test command that always fails
     assertFalse "Should fail after max attempts" "retry_command 2 1 false"
-    
+
     # Test with actual command
     assertTrue "Should retry ls command" "retry_command 2 1 ls /tmp >/dev/null 2>&1"
 }
