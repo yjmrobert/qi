@@ -1,3 +1,4 @@
+---
 name: Release
 
 on:
@@ -141,17 +142,17 @@ jobs:
         
         # Create installation instructions
         cat > "$ASSET_NAME/INSTALL.txt" << EOF
-qi - Git Repository Script Manager $VERSION
+qi - Git Repository Script Manager ${VERSION}
 
 Installation Instructions:
 =========================
 
 Quick Installation:
-  curl -fsSL https://github.com/yjmrobert/qi/releases/download/$VERSION/install.sh | bash
+  curl -fsSL https://github.com/yjmrobert/qi/releases/download/${VERSION}/install.sh | bash
 
 Manual Installation:
-  1. Extract this archive: tar -xzf qi-$VERSION.tar.gz
-  2. cd qi-$VERSION
+  1. Extract this archive: tar -xzf qi-${VERSION}.tar.gz
+  2. cd qi-${VERSION}
   3. chmod +x qi install.sh
   4. sudo ./install.sh
 
@@ -166,8 +167,8 @@ EOF
         
         # Create checksums
         cat > "$ASSET_NAME/CHECKSUMS.txt" << EOF
-# SHA256 Checksums for qi $VERSION
-# Generated on $(date -u)
+# SHA256 Checksums for qi ${VERSION}
+# Generated on \$(date -u)
 EOF
         
         find "$ASSET_NAME" -type f -name "*.sh" -o -name "qi" -o -name "README.md" | while read -r file; do

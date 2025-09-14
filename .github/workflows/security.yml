@@ -1,3 +1,4 @@
+---
 name: Security Scan
 
 on:
@@ -147,13 +148,21 @@ jobs:
         )
         
         # Search for patterns in all text files
+        FOUND_SECRETS=false
         for pattern in "${PATTERNS[@]}"; do
           echo "Checking pattern: $pattern"
           
-          if grep -r -E -i "$pattern" --include="*.sh" --include="*.bash" --include="*.txt" --include="*.md" . | grep -v "^#" | grep -v "test" | grep -v "example"; then
+          if grep -r -E -i "$pattern" --include="*.sh" --include="*.bash" --include="*.txt" --include="*.md" . | grep -v "^#" | grep -v "test" | grep -v "example" | grep -v "PATTERNS" >/dev/null 2>&1; then
             echo "⚠️  Potential secret pattern found: $pattern"
+            FOUND_SECRETS=true
           fi
         done
+        
+        if [ "$FOUND_SECRETS" = "true" ]; then
+          echo "⚠️  Potential secrets found - please review"
+        else
+          echo "✅ No secrets found with custom patterns"
+        fi
         
         echo "✅ Custom secret pattern scan completed"
 
@@ -193,16 +202,22 @@ jobs:
         EOF
         
         echo "Checking for dangerous bash patterns..."
+        FOUND_DANGEROUS=false
         while IFS= read -r pattern; do
           if [[ "$pattern" =~ ^#.*$ ]] || [[ -z "$pattern" ]]; then
             continue
           fi
           
           echo "Checking pattern: $pattern"
-          if grep -r -E "$pattern" --include="*.sh" --include="*.bash" .; then
+          if grep -r -E "$pattern" --include="*.sh" --include="*.bash" . >/dev/null 2>&1; then
             echo "⚠️  Potentially dangerous pattern found: $pattern"
+            FOUND_DANGEROUS=true
           fi
         done < security-patterns.txt
+        
+        if [ "$FOUND_DANGEROUS" = "false" ]; then
+          echo "✅ No dangerous patterns found"
+        fi
         
     - name: Check file permissions
       run: |
@@ -261,20 +276,26 @@ jobs:
           '`.*\$[0-9]'
         )
         
+        FOUND_INJECTION=false
         for pattern in "${INJECTION_PATTERNS[@]}"; do
           echo "Checking for injection pattern: $pattern"
-          if grep -r -E "$pattern" --include="*.sh" --include="*.bash" .; then
+          if grep -r -E "$pattern" --include="*.sh" --include="*.bash" . >/dev/null 2>&1; then
             echo "⚠️  Potential command injection: $pattern"
+            FOUND_INJECTION=true
           fi
         done
         
+        if [ "$FOUND_INJECTION" = "false" ]; then
+          echo "✅ No command injection patterns found"
+        fi
+        
         # Check for proper input validation
         echo "Checking for input validation patterns..."
-        if grep -r -E '\[\[.*=~.*\]\]' --include="*.sh" --include="*.bash" .; then
+        if grep -r -E '\[\[.*=~.*\]\]' --include="*.sh" --include="*.bash" . >/dev/null 2>&1; then
           echo "✅ Found regex validation patterns"
         fi
         
-        if grep -r -E 'validate_.*\(' --include="*.sh" --include="*.bash" .; then
+        if grep -r -E 'validate_.*\(' --include="*.sh" --include="*.bash" . >/dev/null 2>&1; then
           echo "✅ Found validation functions"
         fi
 
@@ -351,18 +372,24 @@ jobs:
         echo "Checking for potentially unsafe operations..."
         
         # Check for recursive deletion
-        if grep -r -E 'rm.*-r.*\$' --include="*.sh" --include="*.bash" . | grep -v test; then
+        if grep -r -E 'rm.*-r.*\$' --include="*.sh" --include="*.bash" . | grep -v test >/dev/null 2>&1; then
           echo "⚠️  Found potentially unsafe recursive deletion"
+        else
+          echo "✅ No unsafe recursive deletion found"
         fi
         
         # Check for broad file operations
-        if grep -r -E 'chmod.*777' --include="*.sh" --include="*.bash" .; then
+        if grep -r -E 'chmod.*777' --include="*.sh" --include="*.bash" . >/dev/null 2>&1; then
           echo "⚠️  Found overly permissive chmod"
+        else
+          echo "✅ No overly permissive chmod found"
         fi
         
         # Check for sudo usage
-        if grep -r -E 'sudo' --include="*.sh" --include="*.bash" . | grep -v test; then
+        if grep -r -E 'sudo' --include="*.sh" --include="*.bash" . | grep -v test >/dev/null 2>&1; then
           echo "ℹ️  Found sudo usage (review for necessity)"
+        else
+          echo "✅ No sudo usage found"
         fi
         
     - name: Generate security report
@@ -427,7 +454,7 @@ jobs:
         path: results/
         
     - name: Upload SARIF to GitHub Security
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: results/shellcheck.sarif
