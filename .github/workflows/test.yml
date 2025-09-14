@@ -12,74 +12,143 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        bash-version: ['4.4', '5.0', '5.1', '5.2']
+        bash-version: ['system', '4.4', '5.0', '5.1']
+      fail-fast: false
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Install Bash ${{ matrix.bash-version }}
-      run: |
-        if [ "${{ matrix.bash-version }}" != "5.2" ]; then
-          # Install specific bash versions for compatibility testing
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-          wget https://ftp.gnu.org/gnu/bash/bash-${{ matrix.bash-version }}.tar.gz
-          tar -xzf bash-${{ matrix.bash-version }}.tar.gz
-          cd bash-${{ matrix.bash-version }}
-          ./configure --prefix=/usr/local/bash-${{ matrix.bash-version }}
-          make && sudo make install
-          sudo ln -sf /usr/local/bash-${{ matrix.bash-version }}/bin/bash /usr/local/bin/bash-${{ matrix.bash-version }}
-        else
-          # Use system bash for 5.2 (latest)
-          sudo ln -sf /bin/bash /usr/local/bin/bash-${{ matrix.bash-version }}
-        fi
-        
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y git curl wget shellcheck
+        sudo apt-get install -y git curl wget shellcheck build-essential
+        
+    - name: Setup Bash ${{ matrix.bash-version }}
+      run: |
+        if [ "${{ matrix.bash-version }}" = "system" ]; then
+          echo "Using system bash: $(bash --version | head -1)"
+          echo "BASH_CMD=bash" >> $GITHUB_ENV
+        else
+          # Install specific bash version
+          echo "Installing Bash ${{ matrix.bash-version }}..."
+          cd /tmp
+          wget -q https://ftp.gnu.org/gnu/bash/bash-${{ matrix.bash-version }}.tar.gz
+          tar -xzf bash-${{ matrix.bash-version }}.tar.gz
+          cd bash-${{ matrix.bash-version }}
+          ./configure --prefix=/usr/local/bash-${{ matrix.bash-version }} --quiet
+          make -j$(nproc) --quiet
+          sudo make install --quiet
+          echo "BASH_CMD=/usr/local/bash-${{ matrix.bash-version }}/bin/bash" >> $GITHUB_ENV
+          echo "Installed: $(/usr/local/bash-${{ matrix.bash-version }}/bin/bash --version | head -1)"
+        fi
+        
+    - name: Verify bash installation
+      run: |
+        echo "Using bash command: $BASH_CMD"
+        $BASH_CMD --version
         
     - name: Setup test environment
       run: |
-        chmod +x qi
-        chmod +x install.sh
-        chmod +x test.sh
-        chmod +x run_tests.sh
-        chmod +x tests/*.sh
-        chmod +x tools/bash_coverage.sh
+        echo "Setting up test environment..."
+        chmod +x qi install.sh test.sh run_tests.sh
+        chmod +x tests/*.sh tools/bash_coverage.sh
         
-    - name: Verify qi script syntax
+        # Set environment variables for consistent behavior
+        export QI_CACHE_DIR="$HOME/.qi/cache"
+        export QI_CONFIG_FILE="$HOME/.qi/config"
+        export QI_VERBOSE="false"
+        echo "QI_CACHE_DIR=$QI_CACHE_DIR" >> $GITHUB_ENV
+        echo "QI_CONFIG_FILE=$QI_CONFIG_FILE" >> $GITHUB_ENV
+        echo "QI_VERBOSE=$QI_VERBOSE" >> $GITHUB_ENV
+        
+    - name: Verify script syntax
       run: |
-        bash -n qi
-        bash -n install.sh
-        bash -n test.sh
-        bash -n run_tests.sh
+        echo "Checking script syntax..."
+        $BASH_CMD -n qi
+        $BASH_CMD -n install.sh  
+        $BASH_CMD -n test.sh
+        $BASH_CMD -n run_tests.sh
+        echo "All syntax checks passed"
+        
+    - name: Run shellcheck (system bash only)
+      if: matrix.bash-version == 'system'
+      run: |
+        echo "Running shellcheck..."
+        shellcheck qi install.sh test.sh run_tests.sh || echo "Shellcheck warnings found (non-fatal)"
         
     - name: Run basic functionality tests
       run: |
-        export PATH="/usr/local/bin/bash-${{ matrix.bash-version }}:$PATH"
-        bash-${{ matrix.bash-version }} test.sh
+        echo "Running basic functionality tests with $BASH_CMD..."
+        echo "Current directory: $(pwd)"
+        echo "Available files: $(ls -la | head -10)"
+        timeout 120 $BASH_CMD test.sh
         
     - name: Run comprehensive test suite
       run: |
-        export PATH="/usr/local/bin/bash-${{ matrix.bash-version }}:$PATH"
-        # Disable coverage for now due to instrumentation issues breaking shunit2
-        bash-${{ matrix.bash-version }} run_tests.sh --no-coverage --verbose
+        echo "Running comprehensive test suite with $BASH_CMD..."
+        echo "Test files available:"
+        ls -la tests/
+        timeout 300 $BASH_CMD run_tests.sh --no-coverage --verbose
         
     - name: Test installation script
       run: |
-        # Test install script functions without actually installing
-        bash -n install.sh
+        echo "Testing installation script..."
+        $BASH_CMD -n install.sh
         echo "Installation script syntax check passed"
         
-    - name: Upload test results
-      if: matrix.bash-version == '5.2'
+    - name: Generate test summary
+      if: always()
+      run: |
+        echo "=== Test Summary for Bash ${{ matrix.bash-version }} ==="
+        echo "Bash version: $($BASH_CMD --version | head -1)"
+        echo "Test environment: $(uname -a)"
+        echo "Working directory: $(pwd)"
+        echo "Exit status: $?"
+        
+    - name: Upload test artifacts
+      if: failure() && matrix.bash-version == 'system'
       uses: actions/upload-artifact@v4
       with:
-        name: test-results
+        name: test-artifacts
         path: |
-          *.log
           coverage/
+          *.log
+          /tmp/*.log
+        retention-days: 7
+        if-no-files-found: ignore
+
+  # Separate job for testing with coverage (only on system bash)
+  coverage:
+    name: Coverage Test
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git curl wget
+        
+    - name: Setup test environment
+      run: |
+        chmod +x qi install.sh test.sh run_tests.sh
+        chmod +x tests/*.sh tools/bash_coverage.sh
+        
+    - name: Run tests with coverage
+      run: |
+        echo "Running tests with coverage..."
+        # Try to run with coverage, but don't fail if coverage has issues
+        bash run_tests.sh --verbose || bash run_tests.sh --no-coverage --verbose
+        
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-reports
+        path: coverage/
         retention-days: 30
-        if-no-files-found: warn
+        if-no-files-found: ignore
