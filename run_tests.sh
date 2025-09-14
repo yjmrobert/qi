@@ -11,6 +11,7 @@ PROJECT_ROOT="$SCRIPT_DIR"
 TESTS_DIR="$PROJECT_ROOT/tests"
 TOOLS_DIR="$PROJECT_ROOT/tools"
 COVERAGE_TOOL="$TOOLS_DIR/bash_coverage.sh"
+SIMPLE_COVERAGE_TOOL="$TOOLS_DIR/bash_coverage_simple.sh"
 COVERAGE_DIR="$PROJECT_ROOT/coverage"
 SHUNIT2="$PROJECT_ROOT/shunit2"
 
@@ -84,8 +85,8 @@ check_prerequisites() {
     fi
     
     # Check for coverage tool
-    if [[ "$ENABLE_COVERAGE" == "true" && ! -f "$COVERAGE_TOOL" ]]; then
-        missing_deps+=("coverage tool (expected at $COVERAGE_TOOL)")
+    if [[ "$ENABLE_COVERAGE" == "true" && ! -f "$COVERAGE_TOOL" && ! -f "$SIMPLE_COVERAGE_TOOL" ]]; then
+        missing_deps+=("coverage tool (expected at $COVERAGE_TOOL or $SIMPLE_COVERAGE_TOOL)")
     elif [[ "$ENABLE_COVERAGE" == "true" ]]; then
         print_success "Coverage tool found"
     fi
@@ -159,10 +160,18 @@ run_test_file() {
     local exit_code=0
     if [[ "$ENABLE_COVERAGE" == "true" ]]; then
         if [[ "$VERBOSE" == "true" ]]; then
-            "$COVERAGE_TOOL" run "$test_file" 2>&1 | tee "$output_file"
+            if [[ "$(basename "$COVERAGE_TOOL")" == "bash_coverage_simple.sh" ]]; then
+                "$COVERAGE_TOOL" run "$test_file" 2>&1 | tee "$output_file"
+            else
+                bash "$COVERAGE_TOOL" run_with_coverage "$test_file" 2>&1 | tee "$output_file"
+            fi
             exit_code=${PIPESTATUS[0]}
         else
-            "$COVERAGE_TOOL" run "$test_file" > "$output_file" 2> "$error_file"
+            if [[ "$(basename "$COVERAGE_TOOL")" == "bash_coverage_simple.sh" ]]; then
+                "$COVERAGE_TOOL" run "$test_file" > "$output_file" 2> "$error_file"
+            else
+                bash "$COVERAGE_TOOL" run_with_coverage "$test_file" > "$output_file" 2> "$error_file"
+            fi
             exit_code=$?
         fi
     else
@@ -244,7 +253,18 @@ run_all_tests() {
     # Initialize coverage if enabled
     if [[ "$ENABLE_COVERAGE" == "true" ]]; then
         print_section "Initializing Coverage"
-        "$COVERAGE_TOOL" init
+        if [[ -f "$COVERAGE_TOOL" ]]; then
+            "$COVERAGE_TOOL" init_coverage 2>/dev/null || {
+                print_warning "Advanced coverage tool failed, using simple coverage"
+                chmod +x "$SIMPLE_COVERAGE_TOOL"
+                "$SIMPLE_COVERAGE_TOOL" init
+                COVERAGE_TOOL="$SIMPLE_COVERAGE_TOOL"
+            }
+        else
+            chmod +x "$SIMPLE_COVERAGE_TOOL"
+            "$SIMPLE_COVERAGE_TOOL" init
+            COVERAGE_TOOL="$SIMPLE_COVERAGE_TOOL"
+        fi
     fi
     
     # Create output directory
@@ -324,10 +344,13 @@ generate_coverage_report() {
     
     # Generate coverage analysis
     local coverage_exit_code=0
-    "$COVERAGE_TOOL" analyze || coverage_exit_code=$?
-    
-    # Generate HTML report
-    "$COVERAGE_TOOL" html
+    if [[ "$(basename "$COVERAGE_TOOL")" == "bash_coverage_simple.sh" ]]; then
+        "$COVERAGE_TOOL" analyze || coverage_exit_code=$?
+        "$COVERAGE_TOOL" html
+    else
+        bash "$COVERAGE_TOOL" analyze_coverage || coverage_exit_code=$?
+        bash "$COVERAGE_TOOL" generate_html_report
+    fi
     
     print_info "Coverage reports generated in $COVERAGE_DIR/"
     

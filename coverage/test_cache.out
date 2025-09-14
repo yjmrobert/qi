@@ -1,0 +1,18 @@
+[0;34mRunning /workspace/tests/test_cache.sh with simple coverage tracking...[0m
+test_init_cache
+test_init_cache_existing
+test_init_cache_readonly
+test_get_repo_dir
+test_get_repo_metadata_file
+test_create_repo_metadata
+test_read_repo_metadata
+test_read_repo_metadata_nonexistent
+test_update_repo_metadata
+test_repo_exists
+test_list_cached_repos
+test_get_repo_name_from_url
+test_check_repo_name_conflict
+test_generate_unique_repo_name
+test_remove_repo_from_cache
+test_remove_repo_from_cache_nonexistent
+test_acquire_cache_lock

@@ -57,7 +57,20 @@ instrument_script() {
         
         # Process each line of the original script
         local line_num=1
+        local in_function=0
+        local in_case=0
         while IFS= read -r line; do
+            # Track function and case statement nesting
+            if [[ "$line" =~ ^[[:space:]]*[a-zA-Z_][a-zA-Z0-9_]*\(\)[[:space:]]*\{?[[:space:]]*$ ]]; then
+                ((in_function++))
+            elif [[ "$line" =~ ^[[:space:]]*case[[:space:]] ]]; then
+                ((in_case++))
+            elif [[ "$line" =~ ^[[:space:]]*\}[[:space:]]*$ ]] && [[ $in_function -gt 0 ]]; then
+                ((in_function--))
+            elif [[ "$line" =~ ^[[:space:]]*esac[[:space:]]*$ ]] && [[ $in_case -gt 0 ]]; then
+                ((in_case--))
+            fi
+            
             # Skip shebang line
             if [[ $line_num -eq 1 && "$line" =~ ^#! ]]; then
                 echo "# Original shebang: $line"
@@ -69,8 +82,25 @@ instrument_script() {
                 echo "$line"
             else
                 # Add line tracking before executable lines
-                echo "track_line $line_num"
-                echo "$line"
+                # Simplified approach: only track top-level executable statements
+                if [[ "$line" =~ ^[[:space:]]*# ]] || \
+                   [[ "$line" =~ ^[[:space:]]*$ ]] || \
+                   [[ "$line" =~ ^[[:space:]]*\{ ]] || \
+                   [[ "$line" =~ ^[[:space:]]*\} ]] || \
+                   [[ "$line" =~ ^[[:space:]]*fi[[:space:]]*$ ]] || \
+                   [[ "$line" =~ ^[[:space:]]*done[[:space:]]*$ ]] || \
+                   [[ "$line" =~ ^[[:space:]]*esac[[:space:]]*$ ]] || \
+                   [[ "$line" =~ \(\)[[:space:]]*$ ]] || \
+                   [[ "$line" =~ case.*in[[:space:]]*$ ]] || \
+                   [[ "$line" =~ \)[[:space:]]*$ ]] || \
+                   [[ $in_function -gt 0 ]] || [[ $in_case -gt 0 ]]; then
+                    # Don't track structural elements or function/case content
+                    echo "$line"
+                else
+                    # Add tracking for regular executable lines
+                    echo "track_line $line_num"
+                    echo "$line"
+                fi
             fi
             ((line_num++))
         done < "$input_file"
