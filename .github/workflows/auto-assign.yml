@@ -15,181 +15,181 @@ jobs:
       pull-requests: write
 
     steps:
-    - name: Auto assign issues
-      if: github.event_name == 'issues'
-      uses: actions/github-script@v8
-      with:
-        script: |
-          const issue = context.payload.issue;
+      - name: Auto assign issues
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const issue = context.payload.issue;
 
-          // Auto-assign to repository owner for now
-          // In the future, this could be more sophisticated based on labels or content
-          await github.rest.issues.addAssignees({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: issue.number,
-            assignees: ['yjmrobert']
-          });
-
-          // Add appropriate labels based on issue content
-          const labels = [];
-          const title = issue.title.toLowerCase();
-          const body = (issue.body || '').toLowerCase();
-
-          if (title.includes('bug') || title.includes('error') || title.includes('fail')) {
-            labels.push('bug');
-          }
-
-          if (title.includes('feature') || title.includes('enhancement') || body.includes('feature request')) {
-            labels.push('enhancement');
-          }
-
-          if (title.includes('doc') || title.includes('readme') || body.includes('documentation')) {
-            labels.push('documentation');
-          }
-
-          if (title.includes('question') || title.includes('help') || body.includes('how to')) {
-            labels.push('question');
-          }
-
-          if (title.includes('install') || body.includes('installation')) {
-            labels.push('installation');
-          }
-
-          if (title.includes('security') || body.includes('security') || body.includes('vulnerability')) {
-            labels.push('security');
-          }
-
-          // Add good first issue label for simple issues
-          if (title.includes('typo') || title.includes('simple') || body.includes('good first issue')) {
-            labels.push('good first issue');
-          }
-
-          if (labels.length > 0) {
-            await github.rest.issues.addLabels({
+            // Auto-assign to repository owner for now
+            // In the future, this could be more sophisticated based on labels or content
+            await github.rest.issues.addAssignees({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              labels: labels
+              assignees: ['yjmrobert']
             });
-          }
 
-    - name: Auto assign pull requests
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v8
-      with:
-        script: |
-          const pr = context.payload.pull_request;
+            // Add appropriate labels based on issue content
+            const labels = [];
+            const title = issue.title.toLowerCase();
+            const body = (issue.body || '').toLowerCase();
 
-          // Only request review if PR author is not the repository owner
-          if (pr.user.login !== 'yjmrobert') {
-            await github.rest.pulls.requestReviewers({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number,
-              reviewers: ['yjmrobert']
-            });
-          }
+            if (title.includes('bug') || title.includes('error') || title.includes('fail')) {
+              labels.push('bug');
+            }
 
-          // Add labels based on changed files
-          const { data: files } = await github.rest.pulls.listFiles({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            pull_number: pr.number
-          });
+            if (title.includes('feature') || title.includes('enhancement') || body.includes('feature request')) {
+              labels.push('enhancement');
+            }
 
-          const labels = [];
-          const changedFiles = files.map(f => f.filename);
+            if (title.includes('doc') || title.includes('readme') || body.includes('documentation')) {
+              labels.push('documentation');
+            }
 
-          // Check what types of files were changed
-          if (changedFiles.some(f => f.endsWith('.sh') || f === 'qi')) {
-            labels.push('shell-scripts');
-          }
+            if (title.includes('question') || title.includes('help') || body.includes('how to')) {
+              labels.push('question');
+            }
 
-          if (changedFiles.some(f => f.includes('.github/workflows'))) {
-            labels.push('github-actions');
-          }
+            if (title.includes('install') || body.includes('installation')) {
+              labels.push('installation');
+            }
 
-          if (changedFiles.some(f => f.includes('test'))) {
-            labels.push('tests');
-          }
+            if (title.includes('security') || body.includes('security') || body.includes('vulnerability')) {
+              labels.push('security');
+            }
 
-          if (changedFiles.some(f => f === 'README.md' || f.endsWith('.md'))) {
-            labels.push('documentation');
-          }
+            // Add good first issue label for simple issues
+            if (title.includes('typo') || title.includes('simple') || body.includes('good first issue')) {
+              labels.push('good first issue');
+            }
 
-          if (changedFiles.some(f => f === 'install.sh')) {
-            labels.push('installation');
-          }
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: labels
+              });
+            }
 
-          if (changedFiles.some(f => f.includes('lib/'))) {
-            labels.push('library');
-          }
-
-          // Check PR title for additional context
-          const title = pr.title.toLowerCase();
-
-          if (title.includes('fix') || title.includes('bug')) {
-            labels.push('bug');
-          }
-
-          if (title.includes('feat') || title.includes('add') || title.includes('new')) {
-            labels.push('enhancement');
-          }
-
-          if (title.includes('refactor') || title.includes('cleanup')) {
-            labels.push('refactor');
-          }
-
-          if (title.includes('security')) {
-            labels.push('security');
-          }
-
-          if (labels.length > 0) {
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr.number,
-              labels: labels
-            });
-          }
-
-    - name: Welcome first-time contributors
-      uses: actions/github-script@v8
-      with:
-        script: |
-          if (context.eventName === 'pull_request') {
+      - name: Auto assign pull requests
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
             const pr = context.payload.pull_request;
 
-            // Check if this is the user's first contribution
-            const { data: prs } = await github.rest.pulls.list({
+            // Only request review if PR author is not the repository owner
+            if (pr.user.login !== 'yjmrobert') {
+              await github.rest.pulls.requestReviewers({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                reviewers: ['yjmrobert']
+              });
+            }
+
+            // Add labels based on changed files
+            const { data: files } = await github.rest.pulls.listFiles({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              creator: pr.user.login,
-              state: 'all'
+              pull_number: pr.number
             });
 
-            if (prs.length === 1) {
-              // This is their first PR
-              const welcomeMessage = `
-              👋 Welcome @${pr.user.login}!
+            const labels = [];
+            const changedFiles = files.map(f => f.filename);
 
-              Thank you for your first contribution to qi! 🎉
+            // Check what types of files were changed
+            if (changedFiles.some(f => f.endsWith('.sh') || f === 'qi')) {
+              labels.push('shell-scripts');
+            }
 
-              Here are a few things to keep in mind:
-              - Make sure all tests pass by running \`./test.sh\` and \`./run_tests.sh\`
-              - Follow the shell scripting best practices
-              - Update documentation if needed
-              - Feel free to ask questions in the comments
+            if (changedFiles.some(f => f.includes('.github/workflows'))) {
+              labels.push('github-actions');
+            }
 
-              We appreciate your contribution and look forward to reviewing your changes!
-              `;
+            if (changedFiles.some(f => f.includes('test'))) {
+              labels.push('tests');
+            }
 
-              await github.rest.issues.createComment({
+            if (changedFiles.some(f => f === 'README.md' || f.endsWith('.md'))) {
+              labels.push('documentation');
+            }
+
+            if (changedFiles.some(f => f === 'install.sh')) {
+              labels.push('installation');
+            }
+
+            if (changedFiles.some(f => f.includes('lib/'))) {
+              labels.push('library');
+            }
+
+            // Check PR title for additional context
+            const title = pr.title.toLowerCase();
+
+            if (title.includes('fix') || title.includes('bug')) {
+              labels.push('bug');
+            }
+
+            if (title.includes('feat') || title.includes('add') || title.includes('new')) {
+              labels.push('enhancement');
+            }
+
+            if (title.includes('refactor') || title.includes('cleanup')) {
+              labels.push('refactor');
+            }
+
+            if (title.includes('security')) {
+              labels.push('security');
+            }
+
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: pr.number,
-                body: welcomeMessage
+                labels: labels
               });
             }
-          }
+
+      - name: Welcome first-time contributors
+        uses: actions/github-script@v8
+        with:
+          script: |
+            if (context.eventName === 'pull_request') {
+              const pr = context.payload.pull_request;
+
+              // Check if this is the user's first contribution
+              const { data: prs } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                creator: pr.user.login,
+                state: 'all'
+              });
+
+              if (prs.length === 1) {
+                // This is their first PR
+                const welcomeMessage = `
+                👋 Welcome @${pr.user.login}!
+
+                Thank you for your first contribution to qi! 🎉
+
+                Here are a few things to keep in mind:
+                - Make sure all tests pass by running \`./test.sh\` and \`./run_tests.sh\`
+                - Follow the shell scripting best practices
+                - Update documentation if needed
+                - Feel free to ask questions in the comments
+
+                We appreciate your contribution and look forward to reviewing your changes!
+                `;
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  body: welcomeMessage
+                });
+              }
+            }

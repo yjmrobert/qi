@@ -198,6 +198,7 @@ jobs:
             | grep -v "for.*key.*in" \
             | grep -v "while.*key" \
             | grep -v "IFS.*key" \
+            | grep -v "if.*\[\[.*-n.*\"\\\$key\"" \
             >/dev/null 2>&1; then
             echo "⚠️  Potential secret pattern found: $pattern"
             FOUND_SECRETS=true
