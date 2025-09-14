@@ -8,6 +8,21 @@ TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$TEST_DIR")"
 LIB_DIR="$PROJECT_ROOT/lib"
 
+# Handle case where script is instrumented and copied to temp directory
+if [[ ! -d "$LIB_DIR" ]]; then
+    # Look for original project structure
+    if [[ -n "${ORIGINAL_FILE:-}" ]]; then
+        ORIGINAL_TEST_DIR="$(cd "$(dirname "$ORIGINAL_FILE")" && pwd)"
+        ORIGINAL_PROJECT_ROOT="$(dirname "$ORIGINAL_TEST_DIR")"
+        LIB_DIR="$ORIGINAL_PROJECT_ROOT/lib"
+    else
+        # Fallback: try to find lib directory in workspace
+        if [[ -d "/workspace/lib" ]]; then
+            LIB_DIR="/workspace/lib"
+        fi
+    fi
+fi
+
 # Source required libraries
 . "$LIB_DIR/utils.sh"
 . "$LIB_DIR/config.sh"

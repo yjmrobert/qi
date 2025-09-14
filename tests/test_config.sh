@@ -8,6 +8,21 @@ TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$TEST_DIR")"
 LIB_DIR="$PROJECT_ROOT/lib"
 
+# Handle case where script is instrumented and copied to temp directory
+if [[ ! -d "$LIB_DIR" ]]; then
+    # Look for original project structure
+    if [[ -n "${ORIGINAL_FILE:-}" ]]; then
+        ORIGINAL_TEST_DIR="$(cd "$(dirname "$ORIGINAL_FILE")" && pwd)"
+        ORIGINAL_PROJECT_ROOT="$(dirname "$ORIGINAL_TEST_DIR")"
+        LIB_DIR="$ORIGINAL_PROJECT_ROOT/lib"
+    else
+        # Fallback: try to find lib directory in workspace
+        if [[ -d "/workspace/lib" ]]; then
+            LIB_DIR="/workspace/lib"
+        fi
+    fi
+fi
+
 # Source required libraries
 . "$LIB_DIR/utils.sh"
 . "$LIB_DIR/config.sh"
@@ -34,9 +49,13 @@ tearDown() {
         rm -rf "$TEST_TEMP_DIR"
     fi
     
-    # Reset config array
-    unset QI_CONFIG
-    declare -A QI_CONFIG
+    # Reset config array with defaults (preserve the original array)
+    QI_CONFIG[cache_dir]="${QI_CACHE_DIR:-$HOME/.qi/cache}"
+    QI_CONFIG[config_file]="${QI_CONFIG_FILE:-$HOME/.qi/config}"
+    QI_CONFIG[default_branch]="${QI_DEFAULT_BRANCH:-main}"
+    QI_CONFIG[auto_update]="${QI_AUTO_UPDATE:-false}"
+    QI_CONFIG[verbose]="${QI_VERBOSE:-false}"
+    QI_CONFIG[max_cache_size]="${QI_MAX_CACHE_SIZE:-1G}"
 }
 
 # Tests for configuration loading

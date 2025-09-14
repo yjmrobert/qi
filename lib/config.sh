@@ -24,7 +24,7 @@ load_config() {
     log "DEBUG" "Loading configuration from: $config_file"
     
     # Read config file line by line
-    while IFS='=' read -r key value; do
+    while IFS='=' read -r key value || [[ -n "$key" ]]; do
         # Skip empty lines and comments
         [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
         
