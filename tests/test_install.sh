@@ -280,7 +280,7 @@ test_install_script_color_functions() {
     fi
     
     assertTrue "Should have print_color function" "grep -q 'print_color()' '$INSTALL_SCRIPT'"
-    assertTrue "Should have color definitions" "grep -q 'COLOR_.*=' '$INSTALL_SCRIPT'"
+    assertTrue "Should have color definitions" "grep -q -E '(RED|GREEN|YELLOW|BLUE|NC)=' '$INSTALL_SCRIPT'"
 }
 
 # Test for install script temporary directory handling

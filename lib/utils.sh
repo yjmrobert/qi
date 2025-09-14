@@ -333,7 +333,21 @@ time_diff() {
 # Escape string for use in regex
 escape_regex() {
     local string="$1"
-    echo "$string" | sed 's/[[\.*^$()+?{|]/\\&/g'
+    # Escape special regex characters one by one
+    string="${string//\\/\\\\}"  # Escape backslashes first
+    string="${string//./\\.}"    # Escape dots
+    string="${string//\*/\\*}"   # Escape asterisks
+    string="${string//\[/\\[}"   # Escape opening brackets
+    string="${string//\]/\\]}"   # Escape closing brackets
+    string="${string//\^/\\^}"   # Escape carets
+    string="${string//\$/\\$}"   # Escape dollar signs
+    string="${string//\(/\\(}"   # Escape opening parentheses
+    string="${string//\)/\\)}"   # Escape closing parentheses
+    string="${string//\+/\\+}"   # Escape plus signs
+    string="${string//\?/\\?}"   # Escape question marks
+    string="${string//\{/\\{}"   # Escape opening braces
+    string="${string//\|/\\|}"   # Escape pipes
+    echo "$string"
 }
 
 # Join array elements with delimiter

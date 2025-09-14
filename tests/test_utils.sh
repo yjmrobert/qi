@@ -191,7 +191,7 @@ test_escape_regex() {
     assertEquals "test\.string" "$result"
     
     result=$(escape_regex "test[bracket]")
-    assertEquals "test\\[bracket\\]" "$result"
+    assertEquals "test\[bracket\]" "$result"
 }
 
 test_join_array() {

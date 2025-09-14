@@ -79,6 +79,96 @@ instrument_script() {
     chmod +x "$output_file"
 }
 
+# Instrument a bash script with path adjustments for coverage tracking
+instrument_script_with_paths() {
+    local input_file="$1"
+    local output_file="$2"
+    local temp_dir="$3"
+    
+    if [[ ! -f "$input_file" ]]; then
+        echo "Error: Input file $input_file not found" >&2
+        return 1
+    fi
+    
+    print_color "$BLUE" "Instrumenting $input_file -> $output_file"
+    
+    # Create instrumented version with line tracking and path adjustments
+    {
+        echo "#!/bin/bash"
+        echo "# Instrumented version of $input_file"
+        echo "COVERAGE_DATA_FILE='$(realpath "$COVERAGE_DATA_FILE")'"
+        echo "ORIGINAL_FILE='$input_file'"
+        echo ""
+        echo "# Coverage tracking function"
+        echo "track_line() {"
+        echo "    echo \"\$ORIGINAL_FILE:\$1\" >> \"\$COVERAGE_DATA_FILE\""
+        echo "}"
+        echo ""
+        
+        # Process each line of the original script
+        local line_num=1
+        local in_function=false
+        local brace_count=0
+        
+        while IFS= read -r line; do
+            # Skip shebang line
+            if [[ $line_num -eq 1 && "$line" =~ ^#! ]]; then
+                echo "# Original shebang: $line"
+            elif [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "${line// }" ]]; then
+                # Skip comments and empty lines
+                echo "$line"
+            elif [[ "$line" =~ ^[[:space:]]*$ ]]; then
+                # Skip blank lines
+                echo "$line"
+            else
+                # Adjust paths for test environment
+                local adjusted_line="$line"
+                if [[ "$line" =~ ^TEST_DIR= ]]; then
+                    # Override TEST_DIR calculation
+                    adjusted_line='TEST_DIR="."'
+                elif [[ "$line" =~ ^PROJECT_ROOT= ]]; then
+                    # Override PROJECT_ROOT calculation
+                    adjusted_line='PROJECT_ROOT="."'
+                elif [[ "$line" =~ ^LIB_DIR= ]]; then
+                    # Override LIB_DIR calculation
+                    adjusted_line='LIB_DIR="./lib"'
+                elif [[ "$line" =~ \"\$PROJECT_ROOT/shunit2\" ]]; then
+                    # Fix shunit2 path
+                    adjusted_line="${line//\$PROJECT_ROOT\/shunit2/./shunit2}"
+                fi
+                
+                # Check if this is a function definition, control structure, or shunit2-related line
+                local is_control_line=false
+                if [[ "$adjusted_line" =~ ^[[:space:]]*(function[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*\(\)|[a-zA-Z_][a-zA-Z0-9_]*[[:space:]]*\(\)) ]] ||
+                   [[ "$adjusted_line" =~ ^[[:space:]]*(if|while|for|case|until)[[:space:]] ]] ||
+                   [[ "$adjusted_line" =~ \{[[:space:]]*$ ]] ||
+                   [[ "$adjusted_line" =~ ^[[:space:]]*\}[[:space:]]*$ ]] ||
+                   [[ "$adjusted_line" =~ ^[[:space:]]*(else|elif|fi|done|esac)[[:space:]]*$ ]] ||
+                   [[ "$adjusted_line" =~ ^[[:space:]]*[a-zA-Z0-9_]+\)[[:space:]]*$ ]] ||
+                   [[ "$adjusted_line" =~ shunit2 ]] ||
+                   [[ "$adjusted_line" =~ ^[[:space:]]*\. ]] ||
+                   [[ "$adjusted_line" =~ ^[[:space:]]*source[[:space:]] ]]; then
+                    is_control_line=true
+                fi
+                
+                # Don't instrument control structure lines, sourcing lines, or shunit2 lines to avoid breaking test discovery
+                if [[ "$is_control_line" == "true" ]]; then
+                    echo "$adjusted_line"
+                else
+                    # Add line tracking before executable lines, but only if it's not a test function call
+                    if [[ ! "$adjusted_line" =~ ^[[:space:]]*test_[a-zA-Z0-9_]*$ ]]; then
+                        echo "track_line $line_num"
+                    fi
+                    echo "$adjusted_line"
+                fi
+            fi
+            ((line_num++))
+        done < "$input_file"
+    } > "$output_file"
+    
+    chmod +x "$output_file"
+}
+
 # Run script with coverage
 run_with_coverage() {
     local script="$1"
@@ -89,14 +179,31 @@ run_with_coverage() {
     temp_dir=$(mktemp -d -t coverage.XXXXXX)
     local instrumented_script="$temp_dir/$(basename "$script")"
     
-    # Instrument the script
-    instrument_script "$script" "$instrumented_script"
+    # Get the original script's directory
+    local script_dir
+    script_dir="$(cd "$(dirname "$script")" && pwd)"
+    local project_root
+    project_root="$(dirname "$script_dir")"
+    
+    # Create lib directory in temp and copy library files
+    if [[ -d "$project_root/lib" ]]; then
+        mkdir -p "$temp_dir/lib"
+        cp -r "$project_root/lib"/* "$temp_dir/lib/"
+    fi
+    
+    # Copy shunit2 if it exists
+    if [[ -f "$project_root/shunit2" ]]; then
+        cp "$project_root/shunit2" "$temp_dir/"
+    fi
+    
+    # Instrument the script with path adjustments
+    instrument_script_with_paths "$script" "$instrumented_script" "$temp_dir"
     
     print_color "$BLUE" "Running $script with coverage tracking..."
     
-    # Run the instrumented script
+    # Run the instrumented script from the temp directory
     local exit_code=0
-    bash "$instrumented_script" "${args[@]}" || exit_code=$?
+    (cd "$temp_dir" && bash "$(basename "$instrumented_script")" "${args[@]}") || exit_code=$?
     
     # Clean up
     rm -rf "$temp_dir"
