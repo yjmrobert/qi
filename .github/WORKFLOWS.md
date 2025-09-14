@@ -17,7 +17,7 @@ The qi project now includes a comprehensive set of GitHub Actions workflows to e
 - Comprehensive test suite execution
 - Coverage report generation
 - Integration testing with real repositories
-- OS compatibility testing (Ubuntu 20.04, 22.04, latest)
+- OS compatibility testing (Ubuntu 22.04, latest)
 - Security checks and documentation validation
 
 **Jobs**:
