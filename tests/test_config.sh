@@ -34,9 +34,15 @@ tearDown() {
         rm -rf "$TEST_TEMP_DIR"
     fi
     
-    # Reset config array
+    # Reset config array with defaults - ensure it's associative
     unset QI_CONFIG
-    declare -A QI_CONFIG
+    declare -gA QI_CONFIG  # Use -g flag to make it global and -A for associative
+    QI_CONFIG[cache_dir]="${QI_CACHE_DIR:-$HOME/.qi/cache}"
+    QI_CONFIG[config_file]="${QI_CONFIG_FILE:-$HOME/.qi/config}"
+    QI_CONFIG[default_branch]="${QI_DEFAULT_BRANCH:-main}"
+    QI_CONFIG[auto_update]="${QI_AUTO_UPDATE:-false}"
+    QI_CONFIG[verbose]="${QI_VERBOSE:-false}"
+    QI_CONFIG[max_cache_size]="${QI_MAX_CACHE_SIZE:-1G}"
 }
 
 # Tests for configuration loading

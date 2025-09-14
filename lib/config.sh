@@ -4,7 +4,7 @@
 # Handles environment variables, config files, and default settings
 
 # Configuration variables with defaults
-declare -A QI_CONFIG
+declare -gA QI_CONFIG
 QI_CONFIG[cache_dir]="${QI_CACHE_DIR:-$HOME/.qi/cache}"
 QI_CONFIG[config_file]="${QI_CONFIG_FILE:-$HOME/.qi/config}"
 QI_CONFIG[default_branch]="${QI_DEFAULT_BRANCH:-main}"

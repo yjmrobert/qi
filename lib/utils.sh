@@ -24,6 +24,36 @@ is_terminal() {
     [[ -t 1 ]]
 }
 
+# Basic logging function
+log() {
+    local level="${1:-INFO}"
+    shift
+    local message="$*"
+    
+    # Only show DEBUG messages if verbose is enabled
+    if [[ "$level" == "DEBUG" && "${QI_CONFIG[verbose]:-false}" != "true" ]]; then
+        return 0
+    fi
+    
+    case "$level" in
+        "ERROR")
+            print_error "$message"
+            ;;
+        "WARN"|"WARNING")
+            print_warning "$message"
+            ;;
+        "INFO")
+            print_info "$message"
+            ;;
+        "DEBUG")
+            print_color "$COLOR_CYAN" "DEBUG: $message" >&2
+            ;;
+        *)
+            echo "$level: $message" >&2
+            ;;
+    esac
+}
+
 # Print colored text
 print_color() {
     local color="$1"
