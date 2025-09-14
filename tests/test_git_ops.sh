@@ -25,12 +25,16 @@ fi
 
 # Source required libraries
 # shellcheck source=../lib/utils.sh
+# shellcheck disable=SC1091
 . "$LIB_DIR/utils.sh"
 # shellcheck source=../lib/config.sh
+# shellcheck disable=SC1091
 . "$LIB_DIR/config.sh"
 # shellcheck source=../lib/cache.sh
+# shellcheck disable=SC1091
 . "$LIB_DIR/cache.sh"
 # shellcheck source=../lib/git-ops.sh
+# shellcheck disable=SC1091
 . "$LIB_DIR/git-ops.sh"
 
 # Test fixtures and setup
@@ -422,4 +426,5 @@ test_clone_repository_dry_run() {
 
 # Load and run shunit2
 # shellcheck source=../shunit2
+# shellcheck disable=SC1091
 . "$PROJECT_ROOT/shunit2"

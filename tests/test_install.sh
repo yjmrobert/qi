@@ -316,4 +316,5 @@ test_install_script_logging() {
 
 # Load and run shunit2
 # shellcheck source=../shunit2
+# shellcheck disable=SC1091
 . "$PROJECT_ROOT/shunit2"
