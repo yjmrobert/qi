@@ -134,7 +134,7 @@ update_repository() {
     if [[ "$has_changes" == "true" && "$force" != "true" ]]; then
         if [[ "$DRY_RUN" == "true" ]]; then
             log "INFO" "DRY RUN: Would handle local changes in $repo_name"
-            cd "$original_dir"
+            cd "$original_dir" || return
             return 0
         fi
         
@@ -158,13 +158,13 @@ update_repository() {
                             break
                         else
                             log "ERROR" "Failed to stash changes"
-                            cd "$original_dir"
+                            cd "$original_dir" || return
                             return 1
                         fi
                         ;;
                     2)
                         log "INFO" "Skipping update for $repo_name"
-                        cd "$original_dir"
+                        cd "$original_dir" || return
                         return 0
                         ;;
                     3)
@@ -180,7 +180,7 @@ update_repository() {
                             break
                         else
                             log "ERROR" "Failed to discard changes"
-                            cd "$original_dir"
+                            cd "$original_dir" || return
                             return 1
                         fi
                         ;;
@@ -193,7 +193,7 @@ update_repository() {
         else
             # Non-interactive mode: skip update
             log "WARN" "Skipping update due to local changes (use --force to override)"
-            cd "$original_dir"
+            cd "$original_dir" || return
             return 1
         fi
     fi
@@ -220,7 +220,7 @@ update_repository() {
     
     if [[ "$DRY_RUN" == "true" ]]; then
         log "INFO" "DRY RUN: Would execute: git pull origin $current_branch"
-        cd "$original_dir"
+        cd "$original_dir" || return
         return 0
     fi
     
@@ -240,12 +240,12 @@ update_repository() {
             log "INFO" "Repository already up-to-date"
         fi
         
-        cd "$original_dir"
+        cd "$original_dir" || return
         return 0
     else
         log "ERROR" "Failed to update repository: $repo_name"
         log "DEBUG" "Git output: $pull_output"
-        cd "$original_dir"
+        cd "$original_dir" || return
         return 1
     fi
 }
@@ -334,7 +334,7 @@ get_repository_status() {
     # If that fails, try with the current branch's upstream
     if [[ -z "$ahead_behind" ]]; then
         local upstream
-        upstream=$(git rev-parse --abbrev-ref @{upstream} 2>/dev/null)
+        upstream=$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)
         if [[ -n "$upstream" ]]; then
             ahead_behind=$(git rev-list --left-right --count "$upstream"...HEAD 2>/dev/null)
         fi
@@ -357,7 +357,7 @@ get_repository_status() {
     behind=$(echo "$ahead_behind" | cut -f1)
     ahead=$(echo "$ahead_behind" | cut -f2)
     
-    cd "$original_dir"
+    cd "$original_dir" || return
     
     # Determine status
     if [[ -n "$status_output" ]]; then
@@ -403,7 +403,7 @@ get_repository_url() {
     local url
     url=$(git remote get-url origin 2>/dev/null)
     
-    cd "$original_dir"
+    cd "$original_dir" || return
     
     if [[ -n "$url" ]]; then
         echo "$url"
@@ -432,7 +432,7 @@ get_repository_branch() {
     local branch
     branch=$(git branch --show-current 2>/dev/null)
     
-    cd "$original_dir"
+    cd "$original_dir" || return
     
     if [[ -n "$branch" ]]; then
         echo "$branch"
@@ -462,7 +462,7 @@ get_repository_last_commit() {
     local commit_info
     commit_info=$(git log -1 --pretty=format:"$format" 2>/dev/null)
     
-    cd "$original_dir"
+    cd "$original_dir" || return
     
     if [[ -n "$commit_info" ]]; then
         echo "$commit_info"
@@ -504,18 +504,18 @@ verify_repository() {
     # Check git repository integrity
     if ! git fsck --quiet >/dev/null 2>&1; then
         log "ERROR" "Git repository integrity check failed: $repo_name"
-        cd "$original_dir"
+        cd "$original_dir" || return
         return 1
     fi
     
     # Check if remote origin exists
     if ! git remote get-url origin >/dev/null 2>&1; then
         log "ERROR" "Remote origin not configured: $repo_name"
-        cd "$original_dir"
+        cd "$original_dir" || return
         return 1
     fi
     
-    cd "$original_dir"
+    cd "$original_dir" || return
     
     log "DEBUG" "Repository verification passed: $repo_name"
     return 0

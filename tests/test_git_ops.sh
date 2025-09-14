@@ -24,9 +24,13 @@ if [[ ! -d "$LIB_DIR" ]]; then
 fi
 
 # Source required libraries
+# shellcheck source=../lib/utils.sh
 . "$LIB_DIR/utils.sh"
+# shellcheck source=../lib/config.sh
 . "$LIB_DIR/config.sh"
+# shellcheck source=../lib/cache.sh
 . "$LIB_DIR/cache.sh"
+# shellcheck source=../lib/git-ops.sh
 . "$LIB_DIR/git-ops.sh"
 
 # Test fixtures and setup
@@ -43,15 +47,19 @@ setUp() {
     export DRY_RUN=false
     
     # Mock log function to avoid output during tests
+    # shellcheck disable=SC2317  # Function called by test framework
     log() {
         return 0
     }
     
     # Mock print functions
+    # shellcheck disable=SC2317  # Function called by test framework
     print_success() { echo "SUCCESS: $*"; }
+    # shellcheck disable=SC2317  # Function called by test framework
     print_error() { echo "ERROR: $*" >&2; }
     
     # Mock config functions
+    # shellcheck disable=SC2317  # Function called by test framework
     get_config() {
         case "$1" in
             "default_branch") echo "main" ;;
@@ -60,12 +68,17 @@ setUp() {
     }
     
     # Mock cache functions
+    # shellcheck disable=SC2317  # Function called by test framework
     create_repo_metadata() { return 0; }
+    # shellcheck disable=SC2317  # Function called by test framework
     get_repo_dir() { echo "$CACHE_DIR/$1"; }
+    # shellcheck disable=SC2317  # Function called by test framework
     get_timestamp() { echo "2023-01-01T00:00:00Z"; }
+    # shellcheck disable=SC2317  # Function called by test framework
     update_repo_metadata() { return 0; }
     
     # Mock network check
+    # shellcheck disable=SC2317  # Function called by test framework
     check_network() { return 0; }
 }
 
@@ -109,6 +122,7 @@ test_get_repository_status_clean() {
     create_mock_git_repo "$repo_dir"
     
     # Mock git commands for clean status
+    # shellcheck disable=SC2317  # Function called by test framework
     git() {
         case "$1" in
             "status")
@@ -145,6 +159,7 @@ test_get_repository_status_modified() {
     create_mock_git_repo "$repo_dir"
     
     # Mock git commands for modified status
+    # shellcheck disable=SC2317  # Function called by test framework
     git() {
         case "$1" in
             "status")
@@ -173,6 +188,7 @@ test_get_repository_url() {
     create_mock_git_repo "$repo_dir"
     
     # Mock git remote command
+    # shellcheck disable=SC2317  # Function called by test framework
     git() {
         case "$1 $2" in
             "remote get-url")
@@ -206,6 +222,7 @@ test_get_repository_branch() {
     create_mock_git_repo "$repo_dir"
     
     # Mock git branch command
+    # shellcheck disable=SC2317  # Function called by test framework
     git() {
         case "$1 $2" in
             "branch --show-current")
@@ -233,6 +250,7 @@ test_get_repository_last_commit() {
     create_mock_git_repo "$repo_dir"
     
     # Mock git log command
+    # shellcheck disable=SC2317  # Function called by test framework
     git() {
         case "$1" in
             "log")
@@ -260,6 +278,7 @@ test_verify_repository() {
     create_mock_git_repo "$repo_dir"
     
     # Mock git commands
+    # shellcheck disable=SC2317  # Function called by test framework
     git() {
         case "$1" in
             "fsck")
@@ -303,6 +322,7 @@ test_verify_repository_corrupt() {
     create_mock_git_repo "$repo_dir"
     
     # Mock git fsck to fail
+    # shellcheck disable=SC2317  # Function called by test framework
     git() {
         case "$1" in
             "fsck")
@@ -328,6 +348,7 @@ test_is_repository_up_to_date() {
     create_mock_git_repo "$repo_dir"
     
     # Mock git commands for clean status
+    # shellcheck disable=SC2317  # Function called by test framework
     git() {
         case "$1" in
             "status")
@@ -358,6 +379,7 @@ test_is_repository_up_to_date_behind() {
     create_mock_git_repo "$repo_dir"
     
     # Mock git commands for behind status
+    # shellcheck disable=SC2317  # Function called by test framework
     git() {
         case "$1" in
             "status")
@@ -387,7 +409,9 @@ test_clone_repository_dry_run() {
     local repo_name="dry-run-test"
     
     # Mock validate_git_url and normalize_git_url
+    # shellcheck disable=SC2317  # Function called by test framework
     validate_git_url() { return 0; }
+    # shellcheck disable=SC2317  # Function called by test framework
     normalize_git_url() { echo "$1"; }
     
     assertTrue "Should succeed in dry run mode" "clone_repository '$repo_url' '$repo_name' '$TEST_CACHE_DIR'"
@@ -397,4 +421,5 @@ test_clone_repository_dry_run() {
 }
 
 # Load and run shunit2
+# shellcheck source=../shunit2
 . "$PROJECT_ROOT/shunit2"

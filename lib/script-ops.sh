@@ -41,7 +41,7 @@ discover_scripts() {
     mkdir -p "$(dirname "$script_index_file")"
     
     # Clear temporary index
-    > "$temp_index"
+    true > "$temp_index"
     
     # Find all repositories
     local repos
@@ -60,7 +60,7 @@ discover_scripts() {
         if [[ -d "$qi_dir" ]]; then
             while IFS= read -r -d '' script_path; do
                 # Get relative path from repository root
-                local rel_path="${script_path#$repo_dir/}"
+                local rel_path="${script_path#"$repo_dir"/}"
                 
                 # Extract script name (without .bash extension)
                 local script_name
@@ -353,7 +353,7 @@ execute_script() {
         local bg_pid=$!
         echo "Background process started with PID: $bg_pid"
         echo "Log file: /tmp/qi-$script_name-$$.log"
-        cd "$original_dir"
+        cd "$original_dir" || return
         return 0
     else
         log "DEBUG" "Executing: bash $full_path ${script_args[*]}"
@@ -367,7 +367,7 @@ execute_script() {
         local duration
         duration=$(time_diff "$start_time" "$end_time")
         
-        cd "$original_dir"
+        cd "$original_dir" || return
         
         if [[ $exit_code -eq 0 ]]; then
             log "DEBUG" "Script completed successfully in $duration"

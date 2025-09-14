@@ -24,7 +24,9 @@ if [[ ! -d "$LIB_DIR" ]]; then
 fi
 
 # Source required libraries
+# shellcheck source=../lib/utils.sh
 . "$LIB_DIR/utils.sh"
+# shellcheck source=../lib/config.sh
 . "$LIB_DIR/config.sh"
 
 # Test fixtures and setup
@@ -38,6 +40,7 @@ setUp() {
     export TEST_CONFIG_FILE
     
     # Mock log function to avoid output during tests
+    # shellcheck disable=SC2317  # Function called by test framework
     log() {
         return 0
     }
@@ -50,11 +53,17 @@ tearDown() {
     fi
     
     # Reset config array with defaults (preserve the original array)
+    # shellcheck disable=SC2154  # QI_CONFIG is an associative array
     QI_CONFIG[cache_dir]="${QI_CACHE_DIR:-$HOME/.qi/cache}"
+    # shellcheck disable=SC2154  # QI_CONFIG is an associative array
     QI_CONFIG[config_file]="${QI_CONFIG_FILE:-$HOME/.qi/config}"
+    # shellcheck disable=SC2154  # QI_CONFIG is an associative array
     QI_CONFIG[default_branch]="${QI_DEFAULT_BRANCH:-main}"
+    # shellcheck disable=SC2154  # QI_CONFIG is an associative array
     QI_CONFIG[auto_update]="${QI_AUTO_UPDATE:-false}"
+    # shellcheck disable=SC2154  # QI_CONFIG is an associative array
     QI_CONFIG[verbose]="${QI_VERBOSE:-false}"
+    # shellcheck disable=SC2154  # QI_CONFIG is an associative array
     QI_CONFIG[max_cache_size]="${QI_MAX_CACHE_SIZE:-1G}"
 }
 
@@ -137,6 +146,7 @@ test_save_config() {
 
 # Tests for configuration getters and setters
 test_get_config() {
+    # shellcheck disable=SC2154  # QI_CONFIG is an associative array
     QI_CONFIG[test_key]="test_value"
     
     local result
@@ -234,6 +244,7 @@ test_create_default_config_existing() {
 # Tests for configuration initialization
 test_init_config() {
     # Mock required functions
+    # shellcheck disable=SC2317  # Function called by test framework
     check_dependencies() { return 0; }
     
     # Set minimal required config
@@ -243,4 +254,5 @@ test_init_config() {
 }
 
 # Load and run shunit2
+# shellcheck source=../shunit2
 . "$PROJECT_ROOT/shunit2"

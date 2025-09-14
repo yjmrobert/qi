@@ -24,8 +24,11 @@ if [[ ! -d "$LIB_DIR" ]]; then
 fi
 
 # Source required libraries
+# shellcheck source=../lib/utils.sh
 . "$LIB_DIR/utils.sh"
+# shellcheck source=../lib/config.sh
 . "$LIB_DIR/config.sh"
+# shellcheck source=../lib/cache.sh
 . "$LIB_DIR/cache.sh"
 
 # Test fixtures and setup
@@ -39,11 +42,13 @@ setUp() {
     export CACHE_DIR="$TEST_CACHE_DIR"
     
     # Mock log function to avoid output during tests
+    # shellcheck disable=SC2317  # Function called by test framework
     log() {
         return 0
     }
     
     # Mock get_config function
+    # shellcheck disable=SC2317  # Function called by test framework
     get_config() {
         case "$1" in
             "default_branch") echo "main" ;;
@@ -52,6 +57,7 @@ setUp() {
     }
     
     # Mock get_timestamp function
+    # shellcheck disable=SC2317  # Function called by test framework
     get_timestamp() {
         echo "2023-01-01T00:00:00Z"
     }
@@ -343,4 +349,5 @@ test_get_cache_stats() {
 }
 
 # Load and run shunit2
+# shellcheck source=../shunit2
 . "$PROJECT_ROOT/shunit2"
