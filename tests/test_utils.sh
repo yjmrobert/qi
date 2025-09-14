@@ -30,7 +30,8 @@ log() {
 
 # Source the library under test
 if [[ -f "$LIB_DIR/utils.sh" ]]; then
-    # shellcheck source=../lib/utils.sh
+    # shellcheck source=lib/utils.sh
+    # shellcheck disable=SC1091
     . "$LIB_DIR/utils.sh"
 else
     echo "ERROR: Cannot find utils.sh at $LIB_DIR/utils.sh" >&2
@@ -267,5 +268,6 @@ test_is_terminal() {
 }
 
 # Load and run shunit2
-# shellcheck source=../shunit2
+# shellcheck source=shunit2
+# shellcheck disable=SC1091
 . "$PROJECT_ROOT/shunit2"
