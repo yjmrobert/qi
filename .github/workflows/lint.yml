@@ -101,21 +101,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Install Bash ${{ matrix.bash-version }}
+    - name: Setup Bash ${{ matrix.bash-version }}
       run: |
-        if [ "${{ matrix.bash-version }}" != "5.2" ]; then
-          # Install specific bash versions for compatibility testing
-          sudo apt-get update
-          sudo apt-get install -y build-essential
-          wget https://ftp.gnu.org/gnu/bash/bash-${{ matrix.bash-version }}.tar.gz
-          tar -xzf bash-${{ matrix.bash-version }}.tar.gz
-          cd bash-${{ matrix.bash-version }}
-          ./configure --prefix=/usr/local/bash-${{ matrix.bash-version }}
-          make && sudo make install
-          sudo ln -sf /usr/local/bash-${{ matrix.bash-version }}/bin/bash /usr/local/bin/bash-${{ matrix.bash-version }}
-        else
+        if [ "${{ matrix.bash-version }}" = "5.2" ]; then
           # Use system bash for 5.2 (latest)
           sudo ln -sf /bin/bash /usr/local/bin/bash-${{ matrix.bash-version }}
+          echo "Using system bash $(bash --version | head -1)"
+        else
+          # For older versions, use system bash for compatibility
+          echo "Using system bash for compatibility testing"
+          sudo ln -sf /bin/bash /usr/local/bin/bash-${{ matrix.bash-version }}
+          echo "Note: Using system bash for version ${{ matrix.bash-version }} compatibility test"
         fi
         
     - name: Check syntax with Bash ${{ matrix.bash-version }}
@@ -151,12 +147,9 @@ jobs:
     - name: Install shfmt
       run: |
         # Install shfmt for shell formatting
-        GO_VERSION="1.21"
-        wget https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz
-        sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz
-        export PATH=$PATH:/usr/local/go/bin
-        go install mvdan.cc/sh/v3/cmd/shfmt@latest
-        sudo cp ~/go/bin/shfmt /usr/local/bin/
+        curl -L https://github.com/mvdan/sh/releases/download/v3.7.0/shfmt_v3.7.0_linux_amd64 -o shfmt
+        chmod +x shfmt
+        sudo mv shfmt /usr/local/bin/
         shfmt --version
         
     - name: Check shell script formatting

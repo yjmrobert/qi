@@ -26,10 +26,7 @@ jobs:
       matrix:
         os: [ubuntu-20.04, ubuntu-22.04, ubuntu-latest]
         install-method: [curl, wget, manual]
-        user-type: [root, sudo, user]
-        exclude:
-          # Exclude user without sudo for system installation
-          - user-type: user
+        user-type: [root, sudo]
             
     steps:
     - name: Checkout code
@@ -129,9 +126,9 @@ jobs:
             chmod +x /tmp/install-test.sh
             
             if [ "${{ matrix.user-type }}" = "root" ]; then
-              sudo -E INSTALL_DIR="$TEMP_INSTALL_DIR" /tmp/install-test.sh
+              sudo INSTALL_DIR="$TEMP_INSTALL_DIR" /tmp/install-test.sh
             else
-              sudo -E INSTALL_DIR="$TEMP_INSTALL_DIR" /tmp/install-test.sh
+              sudo INSTALL_DIR="$TEMP_INSTALL_DIR" /tmp/install-test.sh
             fi
             ;;
             
@@ -146,9 +143,9 @@ jobs:
             
             # Run manual installation steps
             if [ "${{ matrix.user-type }}" = "root" ]; then
-              sudo -E INSTALL_DIR="$TEMP_INSTALL_DIR" ./install.sh
+              sudo INSTALL_DIR="$TEMP_INSTALL_DIR" ./install.sh
             else
-              sudo -E INSTALL_DIR="$TEMP_INSTALL_DIR" ./install.sh
+              sudo INSTALL_DIR="$TEMP_INSTALL_DIR" ./install.sh
             fi
             ;;
         esac

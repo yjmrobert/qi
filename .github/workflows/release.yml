@@ -141,35 +141,35 @@ jobs:
         cp -r lib "$ASSET_NAME/"
         
         # Create installation instructions
-        cat > "$ASSET_NAME/INSTALL.txt" << EOF
-qi - Git Repository Script Manager ${VERSION}
-
-Installation Instructions:
-=========================
-
-Quick Installation:
-  curl -fsSL https://github.com/yjmrobert/qi/releases/download/${VERSION}/install.sh | bash
-
-Manual Installation:
-  1. Extract this archive: tar -xzf qi-${VERSION}.tar.gz
-  2. cd qi-${VERSION}
-  3. chmod +x qi install.sh
-  4. sudo ./install.sh
-
-Usage:
-  qi --help          # Show help
-  qi add <repo-url>  # Add repository
-  qi <script-name>   # Execute script
-
-For more information, see README.md or visit:
-https://github.com/yjmrobert/qi
-EOF
+        {
+          echo "qi - Git Repository Script Manager ${VERSION}"
+          echo ""
+          echo "Installation Instructions:"
+          echo "========================="
+          echo ""
+          echo "Quick Installation:"
+          echo "  curl -fsSL https://github.com/yjmrobert/qi/releases/download/${VERSION}/install.sh | bash"
+          echo ""
+          echo "Manual Installation:"
+          echo "  1. Extract this archive: tar -xzf qi-${VERSION}.tar.gz"
+          echo "  2. cd qi-${VERSION}"
+          echo "  3. chmod +x qi install.sh"
+          echo "  4. sudo ./install.sh"
+          echo ""
+          echo "Usage:"
+          echo "  qi --help          # Show help"
+          echo "  qi add <repo-url>  # Add repository"
+          echo "  qi <script-name>   # Execute script"
+          echo ""
+          echo "For more information, see README.md or visit:"
+          echo "https://github.com/yjmrobert/qi"
+        } > "$ASSET_NAME/INSTALL.txt"
         
         # Create checksums
-        cat > "$ASSET_NAME/CHECKSUMS.txt" << EOF
-# SHA256 Checksums for qi ${VERSION}
-# Generated on \$(date -u)
-EOF
+        {
+          echo "# SHA256 Checksums for qi ${VERSION}"
+          echo "# Generated on $(date -u)"
+        } > "$ASSET_NAME/CHECKSUMS.txt"
         
         find "$ASSET_NAME" -type f -name "*.sh" -o -name "qi" -o -name "README.md" | while read -r file; do
           sha256sum "$file" >> "$ASSET_NAME/CHECKSUMS.txt"
