@@ -17,7 +17,7 @@ jobs:
     steps:
     - name: Auto assign issues
       if: github.event_name == 'issues'
-      uses: actions/github-script@v6
+      uses: actions/github-script@v8
       with:
         script: |
           const issue = context.payload.issue;
@@ -76,7 +76,7 @@ jobs:
 
     - name: Auto assign pull requests
       if: github.event_name == 'pull_request'
-      uses: actions/github-script@v6
+      uses: actions/github-script@v8
       with:
         script: |
           const pr = context.payload.pull_request;
@@ -155,7 +155,7 @@ jobs:
           }
 
     - name: Welcome first-time contributors
-      uses: actions/github-script@v6
+      uses: actions/github-script@v8
       with:
         script: |
           if (context.eventName === 'pull_request') {
