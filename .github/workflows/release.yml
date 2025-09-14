@@ -280,7 +280,7 @@ jobs:
         echo "Release notes generated"
         
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ needs.validate-release.outputs.version }}
         name: qi ${{ needs.validate-release.outputs.version }}
