@@ -209,6 +209,152 @@ test_error_handling() {
     fi
 }
 
+# Test install script functionality
+test_install_script() {
+    test_info "Testing install script functionality"
+    
+    local install_script="$SCRIPT_DIR/install.sh"
+    
+    # Check if install script exists
+    if [[ ! -f "$install_script" ]]; then
+        test_fail "install.sh script not found"
+        return
+    fi
+    
+    # Check if install script is executable
+    if [[ ! -x "$install_script" ]]; then
+        test_fail "install.sh script is not executable"
+        return
+    fi
+    
+    test_pass "install.sh script exists and is executable"
+    
+    # Test install script syntax
+    if bash -n "$install_script" 2>/dev/null; then
+        test_pass "install.sh script has valid bash syntax"
+    else
+        test_fail "install.sh script has syntax errors"
+        return
+    fi
+    
+    # Test install script functions (source and test individual functions)
+    local temp_test_script="/tmp/test-install-functions.sh"
+    
+    cat > "$temp_test_script" << 'EOF'
+#!/bin/bash
+set -euo pipefail
+
+# Source the install script to test functions
+source "$1"
+
+# Test check_requirements function
+test_check_requirements() {
+    # This should pass on most Linux systems
+    if check_requirements >/dev/null 2>&1; then
+        echo "check_requirements: PASS"
+        return 0
+    else
+        echo "check_requirements: FAIL"
+        return 1
+    fi
+}
+
+# Test create_temp_dir function  
+test_create_temp_dir() {
+    local old_temp_dir="$TEMP_DIR"
+    TEMP_DIR="/tmp/test-qi-install-$$"
+    
+    if create_temp_dir >/dev/null 2>&1 && [[ -d "$TEMP_DIR" ]]; then
+        rm -rf "$TEMP_DIR" 2>/dev/null || true
+        TEMP_DIR="$old_temp_dir"
+        echo "create_temp_dir: PASS"
+        return 0
+    else
+        TEMP_DIR="$old_temp_dir"
+        echo "create_temp_dir: FAIL"
+        return 1
+    fi
+}
+
+# Test utility functions
+test_print_functions() {
+    # Test that print functions don't crash
+    if info "test" >/dev/null 2>&1 && success "test" >/dev/null 2>&1 && warn "test" >/dev/null 2>&1; then
+        echo "print_functions: PASS"
+        return 0
+    else
+        echo "print_functions: FAIL"
+        return 1
+    fi
+}
+
+# Run function tests
+main() {
+    local tests_passed=0
+    local tests_total=0
+    
+    for test_func in test_check_requirements test_create_temp_dir test_print_functions; do
+        tests_total=$((tests_total + 1))
+        if $test_func; then
+            tests_passed=$((tests_passed + 1))
+        fi
+    done
+    
+    echo "Function tests: $tests_passed/$tests_total passed"
+    
+    if [[ $tests_passed -eq $tests_total ]]; then
+        exit 0
+    else
+        exit 1
+    fi
+}
+
+main "$@"
+EOF
+    
+    chmod +x "$temp_test_script"
+    
+    # Run function tests
+    if "$temp_test_script" "$install_script" 2>/dev/null; then
+        test_pass "install.sh script functions work correctly"
+    else
+        test_fail "install.sh script functions failed"
+    fi
+    
+    # Clean up
+    rm -f "$temp_test_script"
+    
+    # Test install script help/usage information
+    if grep -q "Usage:" "$install_script" && grep -q "curl.*bash" "$install_script"; then
+        test_pass "install.sh script contains usage information"
+    else
+        test_fail "install.sh script missing usage information"
+    fi
+    
+    # Test install script has proper error handling
+    if grep -q "set -euo pipefail" "$install_script" && grep -q "trap.*handle_error" "$install_script"; then
+        test_pass "install.sh script has proper error handling"
+    else
+        test_fail "install.sh script missing proper error handling"
+    fi
+    
+    # Test install script has all required functions
+    local required_functions=("check_permissions" "check_requirements" "download_qi" "install_qi" "verify_installation")
+    local missing_functions=()
+    
+    for func in "${required_functions[@]}"; do
+        if ! grep -q "^$func()" "$install_script"; then
+            missing_functions+=("$func")
+        fi
+    done
+    
+    if [[ ${#missing_functions[@]} -eq 0 ]]; then
+        test_pass "install.sh script has all required functions"
+    else
+        test_fail "install.sh script missing functions: ${missing_functions[*]}"
+    fi
+}
+
 # Main test runner
 main() {
     print_color "$BLUE" "qi Test Suite"
@@ -223,6 +369,7 @@ main() {
     test_repository_management
     test_script_functionality
     test_error_handling
+    test_install_script
     
     # Cleanup
     cleanup_test_env

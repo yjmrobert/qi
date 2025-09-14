@@ -39,16 +39,39 @@
 
 ### Install qi
 
+#### Quick Installation (Recommended)
+
+Install qi with a single command:
+
+```bash
+curl -fsSL https://github.com/yjmrobert/qi/raw/main/install.sh | bash
+```
+
+Or with sudo if you don't have root access:
+
+```bash
+curl -fsSL https://github.com/yjmrobert/qi/raw/main/install.sh | sudo bash
+```
+
+#### Manual Installation
+
+If you prefer to install manually:
+
 ```bash
 # Clone the qi repository
-git clone <qi-repository-url>
+git clone https://github.com/yjmrobert/qi.git
 cd qi
 
 # Make the script executable
 chmod +x qi
 
-# Add to PATH (optional but recommended)
+# Install to system PATH
 sudo cp qi /usr/local/bin/
+sudo mkdir -p /usr/local/bin/qi-lib
+sudo cp -r lib/* /usr/local/bin/qi-lib/
+
+# Update qi to use installed lib directory
+sudo sed -i 's|LIB_DIR="\$SCRIPT_DIR/lib"|LIB_DIR="/usr/local/bin/qi-lib"|' /usr/local/bin/qi
 ```
 
 ## Usage
