@@ -333,7 +333,7 @@ time_diff() {
 # Escape string for use in regex
 escape_regex() {
     local string="$1"
-    echo "$string" | sed 's/[[\.*^$()+?{|]/\\&/g'
+    echo "$string" | sed 's/\[/\\[/g' | sed 's/\]/\\]/g' | sed 's/\./\\./g'
 }
 
 # Join array elements with delimiter
