@@ -55,27 +55,32 @@ discover_scripts() {
         
         log "DEBUG" "Scanning repository: $repo_name"
         
-        # Find all .bash files in the repository
-        while IFS= read -r -d '' script_path; do
-            # Get relative path from repository root
-            local rel_path="${script_path#$repo_dir/}"
-            
-            # Extract script name (without .bash extension)
-            local script_name
-            script_name="$(basename "$rel_path" .bash)"
-            
-            # Skip if script name is empty or invalid
-            if [[ -z "$script_name" || "$script_name" == "." ]]; then
-                continue
-            fi
-            
-            # Add to index: script_name|repo_name|relative_path|full_path
-            echo "$script_name|$repo_name|$rel_path|$script_path" >> "$temp_index"
-            ((total_scripts++))
-            
-            log "DEBUG" "Found script: $script_name in $repo_name ($rel_path)"
-            
-        done < <(find "$repo_dir" -name "*.bash" -type f -print0 2>/dev/null)
+        # Find all .bash files in the repository, but only in /qi directory from root
+        local qi_dir="$repo_dir/qi"
+        if [[ -d "$qi_dir" ]]; then
+            while IFS= read -r -d '' script_path; do
+                # Get relative path from repository root
+                local rel_path="${script_path#$repo_dir/}"
+                
+                # Extract script name (without .bash extension)
+                local script_name
+                script_name="$(basename "$rel_path" .bash)"
+                
+                # Skip if script name is empty or invalid
+                if [[ -z "$script_name" || "$script_name" == "." ]]; then
+                    continue
+                fi
+                
+                # Add to index: script_name|repo_name|relative_path|full_path
+                echo "$script_name|$repo_name|$rel_path|$script_path" >> "$temp_index"
+                ((total_scripts++))
+                
+                log "DEBUG" "Found script: $script_name in $repo_name ($rel_path)"
+                
+            done < <(find "$qi_dir" -name "*.bash" -type f -print0 2>/dev/null)
+        else
+            log "DEBUG" "No /qi directory found in repository: $repo_name"
+        fi
     done
     
     # Sort index by script name for easier lookup
