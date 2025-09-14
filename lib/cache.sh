@@ -174,7 +174,7 @@ get_repo_name_from_url() {
     repo_name=$(basename "$url" .git)
     
     # Clean up the name (remove invalid characters)
-    repo_name=$(echo "$repo_name" | sed 's/[^a-zA-Z0-9._-]/_/g')
+    repo_name=${repo_name//[^a-zA-Z0-9._-]/_}
     
     echo "$repo_name"
 }
@@ -264,7 +264,7 @@ get_cache_stats() {
 # Clean up cache
 cleanup_cache() {
     local cache_dir="${1:-$CACHE_DIR}"
-    local force="${2:-false}"
+    # local force="${2:-false}"  # Parameter reserved for future use
     
     log "INFO" "Cleaning up cache: $cache_dir"
     
@@ -363,8 +363,8 @@ check_cache_integrity() {
     
     log "INFO" "Checking cache integrity: $cache_dir"
     
-    # Check each repository
-    list_cached_repos "$cache_dir" | while read -r repo_name; do
+    # Check each repository - avoid subshell by using process substitution
+    while read -r repo_name; do
         local repo_dir
         repo_dir="$(get_repo_dir "$repo_name" "$cache_dir")"
         
@@ -392,7 +392,7 @@ check_cache_integrity() {
         fi
         
         log "DEBUG" "Repository OK: $repo_name"
-    done
+    done < <(list_cached_repos "$cache_dir")
     
     if [[ $errors -eq 0 ]]; then
         log "INFO" "Cache integrity check passed"

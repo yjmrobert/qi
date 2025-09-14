@@ -14,9 +14,9 @@ COLOR_RED='\033[0;31m'
 COLOR_GREEN='\033[0;32m'
 COLOR_YELLOW='\033[1;33m'
 COLOR_BLUE='\033[0;34m'
-COLOR_PURPLE='\033[0;35m'
-COLOR_CYAN='\033[0;36m'
-COLOR_WHITE='\033[1;37m'
+# COLOR_PURPLE='\033[0;35m'  # Unused color variable
+# COLOR_CYAN='\033[0;36m'  # Unused color variable
+# COLOR_WHITE='\033[1;37m'  # Unused color variable
 COLOR_RESET='\033[0m'
 
 # Check if running in a terminal (for colored output)
@@ -120,7 +120,7 @@ sanitize_repo_name() {
     local name="$1"
     
     # Replace invalid characters with underscores
-    name=$(echo "$name" | sed 's/[^a-zA-Z0-9._-]/_/g')
+    name=${name//[^a-zA-Z0-9._-]/_}
     
     # Remove leading/trailing dots and underscores
     name=$(echo "$name" | sed 's/^[._]*//; s/[._]*$//')
@@ -258,7 +258,7 @@ show_spinner() {
     local pid="$1"
     local message="${2:-Processing...}"
     local delay=0.1
-    local spinstr='|/-\'
+    local spinstr="|/-\\" # Spinner characters
     
     # Don't show spinner in non-interactive mode
     if [[ ! -t 1 ]]; then

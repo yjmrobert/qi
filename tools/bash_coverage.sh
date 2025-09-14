@@ -26,7 +26,7 @@ print_color() {
 # Initialize coverage tracking
 init_coverage() {
     mkdir -p "$COVERAGE_DIR"
-    > "$COVERAGE_DATA_FILE"
+    true > "$COVERAGE_DATA_FILE"
     print_color "$BLUE" "Coverage tracking initialized in $COVERAGE_DIR"
 }
 
@@ -87,7 +87,8 @@ run_with_coverage() {
     
     local temp_dir
     temp_dir=$(mktemp -d -t coverage.XXXXXX)
-    local instrumented_script="$temp_dir/$(basename "$script")"
+    local instrumented_script
+    instrumented_script="$temp_dir/$(basename "$script")"
     
     # Instrument the script
     instrument_script "$script" "$instrumented_script"
@@ -132,7 +133,7 @@ analyze_coverage() {
         
         # Count total executable lines in file
         local file_total_lines
-        file_total_lines=$(grep -v -E '^\s*#|^\s*$' "$file" | wc -l)
+        file_total_lines=$(grep -c -v -E '^\s*#|^\s*$' "$file")
         
         # Count covered lines for this file
         local file_covered_lines
@@ -222,9 +223,11 @@ generate_html_report() {
 EOF
     
     # Add file coverage table
-    echo '<h2>File Coverage Summary</h2>' >> "$COVERAGE_REPORT_FILE"
-    echo '<table>' >> "$COVERAGE_REPORT_FILE"
-    echo '<tr><th>File</th><th>Lines Covered</th><th>Total Lines</th><th>Coverage %</th></tr>' >> "$COVERAGE_REPORT_FILE"
+    {
+        echo '<h2>File Coverage Summary</h2>'
+        echo '<table>'
+        echo '<tr><th>File</th><th>Lines Covered</th><th>Total Lines</th><th>Coverage %</th></tr>'
+    } >> "$COVERAGE_REPORT_FILE"
     
     local files
     mapfile -t files < <(cut -d: -f1 "$COVERAGE_DATA_FILE" | sort -u)
@@ -235,7 +238,7 @@ EOF
         fi
         
         local file_total_lines
-        file_total_lines=$(grep -v -E '^\s*#|^\s*$' "$file" | wc -l)
+        file_total_lines=$(grep -c -v -E '^\s*#|^\s*$' "$file")
         
         local file_covered_lines
         file_covered_lines=$(grep "^$file:" "$COVERAGE_DATA_FILE" | cut -d: -f2 | sort -u | wc -l)
@@ -255,8 +258,10 @@ EOF
         echo "<tr class=\"$row_class\"><td>$(basename "$file")</td><td>$file_covered_lines</td><td>$file_total_lines</td><td>$coverage_percent%</td></tr>" >> "$COVERAGE_REPORT_FILE"
     done
     
-    echo '</table>' >> "$COVERAGE_REPORT_FILE"
-    echo '</body></html>' >> "$COVERAGE_REPORT_FILE"
+    {
+        echo '</table>'
+        echo '</body></html>'
+    } >> "$COVERAGE_REPORT_FILE"
     
     print_color "$GREEN" "HTML report generated: $COVERAGE_REPORT_FILE"
 }

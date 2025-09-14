@@ -13,6 +13,7 @@ QI_CONFIG[verbose]="${QI_VERBOSE:-false}"
 QI_CONFIG[max_cache_size]="${QI_MAX_CACHE_SIZE:-1G}"
 
 # Load configuration from file
+# Usage: load_config [config_file_path]
 load_config() {
     local config_file="${1:-${QI_CONFIG[config_file]}}"
     
@@ -170,7 +171,7 @@ init_config() {
     log "DEBUG" "Initializing configuration system"
     
     # Load configuration from file if it exists
-    load_config
+    load_config "$@"
     
     # Override with environment variables if set
     [[ -n "${QI_CACHE_DIR:-}" ]] && QI_CONFIG[cache_dir]="$QI_CACHE_DIR"
@@ -181,7 +182,7 @@ init_config() {
     
     # Apply verbose setting to global variable
     if [[ "${QI_CONFIG[verbose]}" == "true" ]]; then
-        VERBOSE=true
+        export VERBOSE=true  # Global variable used throughout the application
     fi
     
     # Validate configuration
