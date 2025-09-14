@@ -24,9 +24,13 @@ if [[ ! -d "$LIB_DIR" ]]; then
 fi
 
 # Source required libraries
+# shellcheck source=../lib/utils.sh
 . "$LIB_DIR/utils.sh"
+# shellcheck source=../lib/config.sh
 . "$LIB_DIR/config.sh"
+# shellcheck source=../lib/cache.sh
 . "$LIB_DIR/cache.sh"
+# shellcheck source=../lib/script-ops.sh
 . "$LIB_DIR/script-ops.sh"
 
 # Test fixtures and setup
@@ -44,24 +48,30 @@ setUp() {
     export BACKGROUND=false
     
     # Mock log function to avoid output during tests
+    # shellcheck disable=SC2317  # Function called by test framework
     log() {
         return 0
     }
     
     # Mock print functions
+    # shellcheck disable=SC2317  # Function called by test framework
     print_success() { echo "SUCCESS: $*"; }
+    # shellcheck disable=SC2317  # Function called by test framework
     print_error() { echo "ERROR: $*" >&2; }
     
     # Mock cache functions
+    # shellcheck disable=SC2317  # Function called by test framework
     list_cached_repos() {
         if [[ -d "$TEST_CACHE_DIR" ]]; then
             find "$TEST_CACHE_DIR" -maxdepth 1 -type d -name "*" ! -name ".*" -exec basename {} \; 2>/dev/null | sort
         fi
     }
     
+    # shellcheck disable=SC2317  # Function called by test framework
     get_repo_dir() { echo "$CACHE_DIR/$1"; }
     
     # Mock time functions
+    # shellcheck disable=SC2317  # Function called by test framework
     time_diff() { echo "1s"; }
 }
 
@@ -370,4 +380,5 @@ test_rebuild_script_index() {
 }
 
 # Load and run shunit2
+# shellcheck source=../shunit2
 . "$PROJECT_ROOT/shunit2"
