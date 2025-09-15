@@ -24,13 +24,17 @@ if [[ ! -d "$LIB_DIR" ]]; then
 fi
 
 # Source required libraries
-# shellcheck source=../lib/utils.sh
+# shellcheck source=lib/utils.sh
+# shellcheck disable=SC1091
 . "$LIB_DIR/utils.sh"
-# shellcheck source=../lib/config.sh
+# shellcheck source=lib/config.sh
+# shellcheck disable=SC1091
 . "$LIB_DIR/config.sh"
-# shellcheck source=../lib/cache.sh
+# shellcheck source=lib/cache.sh
+# shellcheck disable=SC1091
 . "$LIB_DIR/cache.sh"
-# shellcheck source=../lib/script-ops.sh
+# shellcheck source=lib/script-ops.sh
+# shellcheck disable=SC1091
 . "$LIB_DIR/script-ops.sh"
 
 # Test fixtures and setup
@@ -380,5 +384,6 @@ test_rebuild_script_index() {
 }
 
 # Load and run shunit2
-# shellcheck source=../shunit2
+# shellcheck source=shunit2
+# shellcheck disable=SC1091
 . "$PROJECT_ROOT/shunit2"
