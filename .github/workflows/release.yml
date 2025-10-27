@@ -185,7 +185,7 @@ jobs:
         echo "✅ Release assets created: $ASSET_PATH"
         
     - name: Upload release assets
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: release-assets
         path: |
