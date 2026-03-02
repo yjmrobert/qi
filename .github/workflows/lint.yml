@@ -457,7 +457,7 @@ jobs:
         cat lint-summary.md
         
     - name: Upload lint summary
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: lint-summary
         path: lint-summary.md
