@@ -492,7 +492,7 @@ jobs:
     
     steps:
     - name: Download ShellCheck results
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v8
       with:
         name: shellcheck-results
         path: results/
